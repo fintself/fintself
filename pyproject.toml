@@ -17,8 +17,8 @@ dependencies = [
 [project.scripts]
 fintself = "fintself.cli:app"
 
-[tool.setuptools]
-packages = ["fintself"]
+[tool.setuptools.packages.find]
+include = ["fintself*"]
 
 [project.optional-dependencies]
 dev = [
