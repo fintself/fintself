@@ -1,0 +1,40 @@
+[project]
+name = "fintself"
+version = "0.1.0"
+description = "Scraper de movimientos bancarios open source y colaborativo."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "loguru>=0.7.3",
+    "openpyxl>=3.1.5",
+    "pandas>=2.3.1",
+    "python-dotenv>=1.1.1",
+    "typer[all]>=0.16.0",
+    "playwright>=1.42.0",
+    "pydantic>=2.11.7",
+]
+
+[project.scripts]
+fintself = "fintself.cli:app"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.4.1",
+    "pytest-mock>=3.14.1",
+    "ruff>=0.12.6",
+    "ipykernel>=6.30.0",
+    "ipywidgets>=8.1.7",
+    "python-semantic-release<9.0.0",
+]
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+branch = "main"
+upload_to_pypi = true
+upload_to_gh = true
+commit_subject = "chore(release): bump version to {version}"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.12.6",
+]

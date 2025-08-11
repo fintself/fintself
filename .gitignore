@@ -138,6 +138,7 @@ celerybeat.pid
 .env
 .envrc
 .venv
+debug_output/
 env/
 venv/
 ENV/
@@ -205,3 +206,6 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Mac files
+.DS_Store
