@@ -17,6 +17,9 @@ dependencies = [
 [project.scripts]
 fintself = "fintself.cli:app"
 
+[tool.setuptools]
+packages = ["fintself"]
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.4.1",
@@ -24,17 +27,43 @@ dev = [
     "ruff>=0.12.6",
     "ipykernel>=6.30.0",
     "ipywidgets>=8.1.7",
-    "python-semantic-release<9.0.0",
 ]
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
-branch = "main"
-upload_to_pypi = true
-upload_to_gh = true
-commit_subject = "chore(release): bump version to {version}"
+build_command = "uv build"
+commit_parser = "conventional"
+major_on_zero = false
+tag_format = "v{version}"
+
+[tool.semantic_release.branches.main]
+match = "(main|master)"
+prerelease = false
+
+[tool.semantic_release.changelog]
+changelog_file = "CHANGELOG.md"
+exclude_commit_patterns = [
+    '''chore(?:\([^)]*?\))?: .+''',
+    '''ci(?:\([^)]*?\))?: .+''',
+    '''docs(?:\([^)]*?\))?: .+''',
+    '''refactor(?:\([^)]*?\))?: .+''',
+    '''style(?:\([^)]*?\))?: .+''',
+    '''test(?:\([^)]*?\))?: .+''',
+    '''build\((?!deps\): .+)''',
+    '''Initial [Cc]ommit.*''',
+]
+
+[tool.semantic_release.commit_parser_options]
+minor_tags = ["feat"]
+patch_tags = ["fix", "perf"]
+allowed_tags = ["feat", "fix", "perf", "build", "chore", "ci", "docs", "style", "refactor", "test"]
+
+[tool.semantic_release.publish]
+dist_glob_patterns = ["dist/*"]
+upload_to_vcs_release = true
 
 [dependency-groups]
 dev = [
+    "python-semantic-release>=10.2.0",
     "ruff>=0.12.6",
 ]
