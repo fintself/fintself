@@ -9,9 +9,9 @@ dependencies = [
     "openpyxl>=3.1.5",
     "pandas>=2.3.1",
     "python-dotenv>=1.1.1",
-    "typer[all]>=0.16.0",
     "playwright>=1.42.0",
     "pydantic>=2.11.7",
+    "typer>=0.16.0",
 ]
 
 [project.scripts]
@@ -24,7 +24,6 @@ include = ["fintself*"]
 dev = [
     "pytest>=8.4.1",
     "pytest-mock>=3.14.1",
-    "ruff>=0.12.6",
     "ipykernel>=6.30.0",
     "ipywidgets>=8.1.7",
 ]

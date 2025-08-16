@@ -209,3 +209,10 @@ __marimo__/
 
 # Mac files
 .DS_Store
+
+# AI Agents
+.aider*
+.claude
+
+# Data
+outputs

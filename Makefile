@@ -2,14 +2,10 @@
 
 .DEFAULT_GOAL := help
 
-# Comandos de instalación
 install:
 	@echo "Installing dependencies..."
 	uv pip install -e .[dev]
 
-dev-install: install
-
-# Comandos de calidad de código
 format:
 	@echo "Formatting code with Ruff..."
 	uv run ruff format .
@@ -19,12 +15,10 @@ lint:
 	@echo "Linting code with Ruff..."
 	uv run ruff check .
 
-# Comandos de pruebas
 test:
 	@echo "Running tests..."
 	uv run pytest
 
-# Limpieza
 clean:
 	@echo "Cleaning up..."
 	find . -type f -name '*.pyc' -delete
@@ -63,7 +57,6 @@ clean-debug:
 		echo "No debug_output directory found."; \
 	fi
 
-# Ayuda
 help:
 	@echo "Available commands:"
 	@echo "  install      - Instala las dependencias de producción y desarrollo."
@@ -72,5 +65,3 @@ help:
 	@echo "  test         - Ejecuta la suite de pruebas."
 	@echo "  clean        - Elimina archivos temporales y compilados."
 	@echo "  clean-debug  - Elimina archivos de debug antiguos, mantiene solo la última sesión."
-
-.PHONY: install dev-install format lint test clean clean-debug help
