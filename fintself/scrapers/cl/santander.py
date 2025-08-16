@@ -1,7 +1,8 @@
 import re
 from typing import List, Optional
 
-from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, expect
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import expect
 
 from fintself.core.exceptions import DataExtractionError, LoginError
 from fintself.core.models import MovementModel
@@ -23,6 +24,9 @@ class SantanderScraper(BaseScraper):
 
     def _login(self) -> None:
         """Implements the login logic for Santander Chile."""
+        assert self.user is not None, "User must be provided"
+        assert self.password is not None, "Password must be provided"
+        
         page = self._ensure_page()
         logger.info("Navigating to Santander login page.")
         self._navigate(self.LOGIN_URL, timeout_override=90000)
@@ -276,6 +280,9 @@ class SantanderScraper(BaseScraper):
 
         for row in rows:
             raw_movement = {}
+            if account_id:
+                raw_movement["full_account_id"] = account_id
+
             try:
                 date_text = (
                     row.locator("td.mat-column-date").inner_text(timeout=5000).strip()
@@ -367,6 +374,9 @@ class SantanderScraper(BaseScraper):
 
         for row in rows:
             raw_movement = {}
+            if account_id:
+                raw_movement["full_account_id"] = account_id
+
             try:
                 date_text = (
                     row.locator("td.mat-column-date").inner_text(timeout=5000).strip()

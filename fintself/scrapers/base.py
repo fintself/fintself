@@ -3,7 +3,7 @@ import os
 import random
 import time
 from abc import ABC, abstractmethod
-from typing import List, Optional, Union
+from typing import List, Literal, Optional, Union
 
 from playwright.sync_api import (
     Browser,
@@ -218,7 +218,7 @@ class BaseScraper(ABC):
     def _wait_for_selector(
         self,
         selector: Union[str, Locator],
-        state: str = "visible",
+        state: Literal["attached", "detached", "hidden", "visible"] = "visible",
         timeout_override: Optional[int] = None,
     ) -> Locator:
         """Waits for a selector to be in a specific state."""

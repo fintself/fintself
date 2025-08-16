@@ -18,7 +18,10 @@ class CencosudScraper(BaseScraper):
 
     def _login(self) -> None:
         """Performs the login on mitarjetacencosud.cl."""
-        page = self._ensure_page()
+        assert self.user is not None, "User must be provided"
+        assert self.password is not None, "Password must be provided"
+        
+        self._ensure_page()
         logger.info("Logging into Cencosud.")
         self._navigate(self.LOGIN_URL)
         self._save_debug_info("01_login_page")
@@ -120,6 +123,7 @@ class CencosudScraper(BaseScraper):
                             "status": "unbilled",
                             "date_str": date_str,
                             "amount_str": amount_str,
+                            "full_account_id": account_id,
                         },
                     )
                 )
@@ -179,6 +183,7 @@ class CencosudScraper(BaseScraper):
                             "status": "billed",
                             "date_str": date_str,
                             "amount_str": amount_str,
+                            "full_account_id": account_id,
                         },
                     )
                 )

@@ -23,6 +23,9 @@ class BancoChileScraper(BaseScraper):
 
     def _login(self) -> None:
         """Implements the login logic for Banco de Chile."""
+        assert self.user is not None, "User must be provided"
+        assert self.password is not None, "Password must be provided"
+        
         page = self._ensure_page()
         logger.info("Logging into Banco de Chile.")
         self._navigate(self.LOGIN_URL)
@@ -153,6 +156,7 @@ class BancoChileScraper(BaseScraper):
                                 "date_str": date_str,
                                 "cargo_str": cargo_str,
                                 "abono_str": abono_str,
+                                "full_account_id": account_id,
                             },
                         )
                     )
