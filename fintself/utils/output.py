@@ -1,10 +1,12 @@
-import pandas as pd
-from typing import List
-from fintself.core.models import MovementModel
-from fintself.core.exceptions import OutputError
-from fintself.utils.logging import logger
 import json
 from decimal import Decimal
+from typing import List
+
+import pandas as pd
+
+from fintself.core.exceptions import OutputError
+from fintself.core.models import MovementModel
+from fintself.utils.logging import logger
 
 
 def _movements_to_dataframe(movements: List[MovementModel]) -> pd.DataFrame:

@@ -1,6 +1,7 @@
 # fintself/utils/logging.py
-from loguru import logger
 import sys
+
+from loguru import logger
 
 # Basic Loguru configuration
 logger.remove()  # Removes the default configuration
