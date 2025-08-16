@@ -173,7 +173,7 @@ Usa la sección de **Issues** de GitHub para reportar bugs o proponer nuevas fun
 
 ### Estándares de Código
 
-- **Lenguaje**: El código, los docstrings y los comentarios deben estar en **inglés**. El README, el CODE_OF_CONDUCT, el CONTRIBUTING y los tutoriales debe estar en **español**.
+- **Lenguaje**: El código, los docstrings y los comentarios deben estar en **inglés**. El README, el CONTRIBUTING y los tutoriales debe estar en **español**.
 - **Formato**: Usamos `Ruff` con el perfil de `Black`. Ejecuta `make format` antes de hacer commit.
 - **Docstrings**: Usa el formato [Google Style](https://github.com/google/styleguide/blob/gh-pages/pyguide.md#38-comments-and-docstrings).
 - **Logging**: Usa `Loguru` para un logging estructurado y útil. La configuración se centraliza en `fintself/utils/logging.py`.
@@ -245,6 +245,3 @@ Gracias a esta automatización, los mantenedores no necesitan realizar ningún p
 
 **Nota para mantenedores**: Para que la publicación en PyPI funcione, es necesario configurar un secreto en el repositorio de GitHub llamado `PYPI_API_TOKEN` con un token de API válido de PyPI.
 
-## Código de Conducta
-
-Este proyecto se adhiere a un Código de Conducta para asegurar un ambiente acogedor y respetuoso. Todos los contribuidores y participantes se comprometen a seguir sus lineamientos. Por favor, lee el archivo [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) para más detalles.
