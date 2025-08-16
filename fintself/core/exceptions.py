@@ -9,7 +9,7 @@ class LoginError(FintselfException):
 
     def __init__(
         self,
-        message="Fallo al iniciar sesión. Credenciales incorrectas o problema en el sitio web.",
+        message="Login failed. Incorrect credentials or website issue.",
     ):
         self.message = message
         super().__init__(self.message)
@@ -20,7 +20,7 @@ class DataExtractionError(FintselfException):
 
     def __init__(
         self,
-        message="Fallo al extraer datos. La estructura del sitio web pudo haber cambiado.",
+        message="Data extraction failed. The website structure may have changed.",
     ):
         self.message = message
         super().__init__(self.message)
@@ -30,13 +30,13 @@ class ScraperNotFound(FintselfException):
     """Exception raised when the requested scraper is not found."""
 
     def __init__(self, bank_id: str):
-        self.message = f"Scraper '{bank_id}' no encontrado. Usa 'fintself list' para ver los disponibles."
+        self.message = f"Scraper '{bank_id}' not found. Use 'fintself list' to see available ones."
         super().__init__(self.message)
 
 
 class OutputError(FintselfException):
     """Exception raised when there is a problem generating the output file."""
 
-    def __init__(self, message="Error al generar el archivo de salida."):
+    def __init__(self, message="Error generating output file."):
         self.message = message
         super().__init__(self.message)

@@ -1,17 +1,18 @@
 import os
 import sys
+
 from dotenv import load_dotenv
 
 from fintself import get_scraper
 from fintself.utils.logging import logger
 from fintself.utils.output import save_to_xlsx
 
-# Carga las variables de entorno desde un archivo .env.
+# Load environment variables from a .env file.
 load_dotenv()
 
-# --- Configuración de Depuración ---
-# Modifica esta variable para elegir qué banco quieres depurar.
-# Opciones disponibles: "cl_santander", "cl_banco_chile", "cl_cencosud"
+# --- Debug Configuration ---
+# Modify this variable to choose which bank you want to debug.
+# Available options: "cl_santander", "cl_banco_chile", "cl_cencosud"
 # BANK_TO_DEBUG = "cl_santander"
 # BANK_TO_DEBUG = "cl_cencosud"
 BANK_TO_DEBUG = "cl_banco_chile"
@@ -19,58 +20,58 @@ BANK_TO_DEBUG = "cl_banco_chile"
 
 def main():
     """
-    Función principal para ejecutar un scraper específico en modo de depuración.
-    Este modo muestra el navegador y guarda capturas de pantalla/HTML en `debug_output/`.
+    Main function to run a specific scraper in debug mode.
+    This mode shows the browser and saves screenshots/HTML in `debug_output/`.
     """
-    logger.info(f"--- Iniciando sesión de depuración para: {BANK_TO_DEBUG} ---")
+    logger.info(f"--- Starting debug session for: {BANK_TO_DEBUG} ---")
 
-    # Construye los nombres de las variables de entorno
+    # Build environment variable names
     user_env_var = f"{BANK_TO_DEBUG.upper()}_USER"
     password_env_var = f"{BANK_TO_DEBUG.upper()}_PASSWORD"
 
-    # Obtiene las credenciales
+    # Get credentials
     user = os.getenv(user_env_var)
     password = os.getenv(password_env_var)
 
     if not user or not password:
         logger.error(
-            f"Credenciales para {BANK_TO_DEBUG} no encontradas. "
-            f"Asegúrate de definir {user_env_var} y {password_env_var} en tu archivo .env."
+            f"Credentials for {BANK_TO_DEBUG} not found. "
+            f"Make sure to define {user_env_var} and {password_env_var} in your .env file."
         )
         sys.exit(1)
 
     try:
-        # Obtiene la instancia del scraper en modo de depuración.
-        # Pasamos `debug_mode=True` explícitamente para forzar este modo,
-        # sin importar lo que esté configurado en el archivo .env.
-        # Esto automáticamente hace que headless sea False.
+        # Get the scraper instance in debug mode.
+        # We pass `debug_mode=True` explicitly to force this mode,
+        # regardless of what is configured in the .env file.
+        # This automatically makes headless False.
         scraper = get_scraper(BANK_TO_DEBUG, debug_mode=True)
 
-        # Ejecuta el scraper
+        # Execute the scraper
         movements = scraper.scrape(user=user, password=password)
 
         if movements:
             output_filename = f"outputs/{BANK_TO_DEBUG}_movements.xlsx"
             save_to_xlsx(movements, output_filename)
             logger.success(
-                f"Depuración finalizada. Se encontraron y guardaron {len(movements)} movimientos para {BANK_TO_DEBUG} en '{output_filename}'."
+                f"Debug finished. Found and saved {len(movements)} movements for {BANK_TO_DEBUG} in '{output_filename}'."
             )
         else:
             logger.info(
-                f"Depuración finalizada. No se encontraron movimientos para {BANK_TO_DEBUG}."
+                f"Debug finished. No movements found for {BANK_TO_DEBUG}."
             )
 
         logger.info(
-            "Revisa la carpeta 'debug_output' para ver las capturas de pantalla y archivos HTML."
+            "Check the 'debug_output' folder to see screenshots and HTML files."
         )
 
     except Exception as e:
         logger.error(
-            f"Ocurrió un error durante la depuración de {BANK_TO_DEBUG}: {e}",
+            f"An error occurred during debugging of {BANK_TO_DEBUG}: {e}",
             exc_info=True,
         )
         logger.info(
-            "Revisa la carpeta 'debug_output' para ver las capturas de pantalla y archivos HTML del error."
+            "Check the 'debug_output' folder to see error screenshots and HTML files."
         )
 
 

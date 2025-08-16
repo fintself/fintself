@@ -4,10 +4,10 @@ from fintself.core.exceptions import ScraperNotFound
 from fintself.scrapers.base import BaseScraper
 from fintself.utils.logging import logger
 
-# Importar scrapers específicos aquí para que la factory los encuentre
+# Import specific scrapers here so the factory can find them
 from .cl import BancoChileScraper, CencosudScraper, SantanderScraper
 
-# Diccionario que mapea IDs de banco a clases de scraper
+# Dictionary that maps bank IDs to scraper classes
 _SCRAPERS: Dict[str, Type[BaseScraper]] = {
     "cl_santander": SantanderScraper,
     "cl_cencosud": CencosudScraper,
@@ -55,14 +55,14 @@ def list_available_scrapers() -> Dict[str, str]:
         Dict[str, str]: A dictionary where the key is the bank_id and the value is a description.
     """
     descriptions = {
-        "cl_santander": "Scraper para Banco Santander Chile.",
-        "cl_cencosud": "Scraper para Tarjeta Cencosud Scotiabank.",
-        "cl_banco_chile": "Scraper para Banco de Chile.",
+        "cl_santander": "Scraper for Banco Santander Chile.",
+        "cl_cencosud": "Scraper for Tarjeta Cencosud Scotiabank.",
+        "cl_banco_chile": "Scraper for Banco de Chile.",
     }
 
     return {
         bank_id: descriptions.get(
-            bank_id, f"Scraper para {bank_id.replace('_', ' ').title()}"
+            bank_id, f"Scraper for {bank_id.replace('_', ' ').title()}"
         )
         for bank_id in _SCRAPERS.keys()
     }

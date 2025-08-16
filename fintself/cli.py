@@ -19,7 +19,7 @@ from fintself.utils.output import (
 
 app = typer.Typer(
     name="fintself",
-    help="Fintself: Scraper de movimientos bancarios open source y colaborativo.",
+    help="Fintself: Open source collaborative bank transaction scraper.",
     add_completion=False,
     rich_markup_mode="markdown",
 )
@@ -30,10 +30,10 @@ def list_scrapers_command():
     """
     Lists all available bank scrapers.
     """
-    logger.info("Scrapers de bancos disponibles:")
+    logger.info("Available bank scrapers:")
     scrapers = list_available_scrapers()
     if not scrapers:
-        logger.warning("No se encontraron scrapers disponibles.")
+        logger.warning("No available scrapers found.")
         return
 
     for bank_id, description in scrapers.items():
@@ -43,31 +43,31 @@ def list_scrapers_command():
 @app.command(name="scrape")
 def scrape_bank_command(
     bank_id: str = typer.Argument(
-        ..., help="El identificador del banco a scrapear (ej: cl_santander)."
+        ..., help="The bank identifier to scrape (e.g.: cl_santander)."
     ),
     output_file: Optional[str] = typer.Option(
         None,
         "--output-file",
         "-o",
-        help="Ruta al archivo de salida (ej: mis_datos.xlsx). El formato se infiere de la extensión.",
+        help="Output file path (e.g.: my_data.xlsx). Format is inferred from extension.",
     ),
     output_format: Optional[str] = typer.Option(
         None,
         "--output-format",
         "-f",
-        help="Formato de salida para la consola si no se usa un archivo. Opciones: json, csv.",
+        help="Output format for console if no file is used. Options: json, csv.",
         case_sensitive=False,
     ),
     debug_mode: Optional[bool] = typer.Option(
         None,
         "--debug/--no-debug",
-        help="Habilita o deshabilita el modo de depuración, sobreescribiendo la configuración del .env.",
+        help="Enable or disable debug mode, overriding .env configuration.",
         show_default=False,
     ),
     headless: Optional[bool] = typer.Option(
         None,
         "--headless/--no-headless",
-        help="Ejecuta o no el navegador en modo headless, sobreescribiendo la configuración del .env.",
+        help="Run browser in headless mode or not, overriding .env configuration.",
         show_default=False,
     ),
 ):
@@ -76,13 +76,13 @@ def scrape_bank_command(
     """
     if not output_file and not output_format:
         logger.error(
-            "Debe especificar --output-file para guardar la salida o --output-format para imprimirla en consola."
+            "You must specify --output-file to save output or --output-format to print to console."
         )
         raise typer.Exit(code=1)
 
     if output_file and output_format:
         logger.warning(
-            "Se especificaron --output-file y --output-format. Se priorizará --output-file."
+            "Both --output-file and --output-format specified. --output-file will be prioritized."
         )
         output_format = None
 
@@ -98,7 +98,7 @@ def scrape_bank_command(
             file_format = "json"
         else:
             logger.error(
-                f"Extensión de archivo '{ext}' no soportada. Use .xlsx, .csv, o .json."
+                f"File extension '{ext}' not supported. Use .xlsx, .csv, or .json."
             )
             raise typer.Exit(code=1)
 
@@ -111,7 +111,7 @@ def scrape_bank_command(
     if not user:
         user = typer.prompt(f"Usuario para {bank_id}")
     if not password:
-        password = getpass(f"Contraseña para {bank_id}: ")
+        password = getpass(f"Password for {bank_id}: ")
 
     try:
         # Pass overrides to scraper factory. If None, settings from .env will be used.
@@ -119,7 +119,7 @@ def scrape_bank_command(
         movements = scraper.scrape(user=user, password=password)
 
         if not movements:
-            logger.info("No se encontraron movimientos.")
+            logger.info("No movements found.")
             raise typer.Exit(code=0)
 
         if output_file:
@@ -129,22 +129,22 @@ def scrape_bank_command(
                 save_to_csv(movements, output_file)
             elif file_format == "json":
                 save_to_json(movements, output_file)
-            logger.info(f"Scraping completado. Datos guardados en {output_file}")
+            logger.info(f"Scraping completed. Data saved to {output_file}")
         elif output_format in ["json", "csv"]:
             output_data = get_output_data(movements, output_format)
             typer.echo(output_data)
-            logger.info("Scraping completado. Datos impresos en consola.")
+            logger.info("Scraping completed. Data printed to console.")
         else:
             logger.error(
-                f"Formato de salida '{output_format}' no válido. Use 'json' o 'csv'."
+                f"Output format '{output_format}' not valid. Use 'json' or 'csv'."
             )
             raise typer.Exit(code=1)
 
     except FintselfException as e:
-        logger.error(f"Error en el scraping: {e.message}")
+        logger.error(f"Error en el scraping: {str(e)}")
         raise typer.Exit(code=1)
     except Exception as e:
-        logger.error(f"Ocurrió un error inesperado: {e}", exc_info=debug_mode)
+        logger.error(f"An unexpected error occurred: {e}", exc_info=debug_mode)
         raise typer.Exit(code=1)
 
 
