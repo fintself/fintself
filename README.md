@@ -1,5 +1,3 @@
-# Fintself
-
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/logo_fintself_dark.png">
@@ -147,6 +145,16 @@ Este software se proporciona "tal cual", sin garantía de ningún tipo. Al utili
 - **Usa Fintself bajo tu propio riesgo.** Los desarrolladores no se hacen responsables de ningún problema, pérdida de datos, bloqueo de cuentas o cualquier otro daño que pueda surgir de su uso.
 - **La seguridad de tus credenciales es tu responsabilidad.** Recomendamos encarecidamente utilizar variables de entorno en lugar de escribir tus credenciales en scripts.
 - Los scrapers pueden dejar de funcionar en cualquier momento si el banco actualiza el diseño de su sitio web.
+
+## 🚀 Funcionalidades premium
+
+¿Te gusta Fintself? Descubre funcionalidades avanzadas como:
+- Análisis automático de patrones de gasto
+- Categorización inteligente de transacciones  
+- Reportes y dashboards personalizados
+- Alertas y notificaciones automáticas
+
+Visita [fintself.com/funcionalidades](https://fintself.com/funcionalidades) para más información.
 
 ## ¿Cómo contribuir?
 
