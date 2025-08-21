@@ -31,19 +31,155 @@ class BancoChileScraper(BaseScraper):
         self._navigate(self.LOGIN_URL)
         self._save_debug_info("01_login_page")
 
-        logger.info("Clicking on 'Banco en Línea'.")
-        self._click('a:has-text("Banco en Línea")')
+        # Look for login button - try multiple possible selectors
+        logger.info("Looking for login access button.")
+        login_selectors = [
+            'a:has-text("Ingresar")',
+            'button:has-text("Ingresar")',
+            'a:has-text("Banco en Línea")',
+            'a[href*="login"]',
+            'button[data-test*="login"]',
+            'a:has-text("Acceder")',
+            '.login-button',
+            '[data-cy="login"]'
+        ]
+        
+        login_clicked = False
+        for selector in login_selectors:
+            try:
+                if page.locator(selector).is_visible(timeout=3000):
+                    logger.info(f"Found login button with selector: {selector}")
+                    self._click(selector)
+                    login_clicked = True
+                    break
+            except Exception:
+                continue
+        
+        if not login_clicked:
+            # If no login button found, try direct navigation to login URL
+            logger.info("No login button found, trying direct navigation to login page.")
+            login_urls = [
+                "https://login.portales.bancochile.cl/login",
+                "https://portalpersonas.bancochile.cl/login",
+                "https://sitiospublicos.bancochile.cl/personas/login"
+            ]
+            
+            for login_url in login_urls:
+                try:
+                    self._navigate(login_url)
+                    if page.locator('input[name="username"], input[name="rut"], role=textbox[name="RUT"]').is_visible(timeout=5000):
+                        logger.info(f"Successfully navigated to login page: {login_url}")
+                        break
+                except Exception:
+                    continue
 
-        self._wait_for_selector('role=textbox[name="RUT"]', timeout_override=30000)
+        # Wait for login form elements with multiple possible selectors
+        form_selectors = [
+            'role=textbox[name="RUT"]',
+            'input[name="username"]',
+            'input[name="rut"]',
+            'input[placeholder*="RUT"]',
+            '#username',
+            '#rut'
+        ]
+        
+        form_found = False
+        for selector in form_selectors:
+            try:
+                self._wait_for_selector(selector, timeout_override=10000)
+                logger.info(f"Found login form with selector: {selector}")
+                form_found = True
+                break
+            except Exception:
+                continue
+        
+        if not form_found:
+            self._save_debug_info("login_form_not_found")
+            raise LoginError("Could not find login form after multiple attempts")
+            
         self._save_debug_info("01a_login_frame_loaded")
 
         logger.info("Entering credentials.")
-        self._type('role=textbox[name="RUT"]', self.user, delay=120)
-        self._type('role=textbox[name="Contraseña"]', self.password, delay=120)
+        
+        # Find and fill username/RUT field
+        username_selectors = [
+            'role=textbox[name="RUT"]',
+            'input[name="username"]',
+            'input[name="rut"]',
+            'input[placeholder*="RUT"]',
+            '#username',
+            '#rut'
+        ]
+        
+        username_filled = False
+        for selector in username_selectors:
+            try:
+                if page.locator(selector).is_visible(timeout=3000):
+                    self._type(selector, self.user, delay=120)
+                    logger.info(f"Filled username with selector: {selector}")
+                    username_filled = True
+                    break
+            except Exception:
+                continue
+        
+        if not username_filled:
+            raise LoginError("Could not find username/RUT field")
+        
+        # Find and fill password field
+        password_selectors = [
+            'role=textbox[name="Contraseña"]',
+            'input[name="password"]',
+            'input[type="password"]',
+            'input[placeholder*="contraseña"]',
+            'input[placeholder*="Contraseña"]',
+            '#password'
+        ]
+        
+        password_filled = False
+        for selector in password_selectors:
+            try:
+                if page.locator(selector).is_visible(timeout=3000):
+                    self._type(selector, self.password, delay=120)
+                    logger.info(f"Filled password with selector: {selector}")
+                    password_filled = True
+                    break
+            except Exception:
+                continue
+        
+        if not password_filled:
+            raise LoginError("Could not find password field")
+        
         self._save_debug_info("02_credentials_entered")
 
         logger.info("Submitting login form.")
-        self._click('role=button[name="Ingresar a cuenta"]')
+        
+        # Find and click submit button
+        submit_selectors = [
+            'role=button[name="Ingresar a cuenta"]',
+            'button[type="submit"]',
+            'input[type="submit"]',
+            'button:has-text("Ingresar")',
+            'button:has-text("Entrar")',
+            'button:has-text("Acceder")',
+            '.login-submit',
+            '[data-cy="submit"]'
+        ]
+        
+        submit_clicked = False
+        for selector in submit_selectors:
+            try:
+                if page.locator(selector).is_visible(timeout=3000):
+                    self._click(selector)
+                    logger.info(f"Clicked submit with selector: {selector}")
+                    submit_clicked = True
+                    break
+            except Exception:
+                continue
+        
+        if not submit_clicked:
+            # Try pressing Enter as fallback
+            logger.info("Could not find submit button, trying Enter key")
+            page.keyboard.press("Enter")
 
         logger.info("Waiting for post-login page.")
         try:
@@ -298,10 +434,56 @@ class BancoChileScraper(BaseScraper):
 
                 if not is_last_overall_account:
                     logger.info("Going back to account selection modal.")
-                    self._click('button:has-text("Seleccionar otra cuenta")')
-                    self._wait_for_selector(
-                        'h2:has-text("Seleccione una cuenta")', timeout_override=20000
-                    )
+                    # Try multiple selectors for "select another account" button/link
+                    account_selection_selectors = [
+                        'button:has-text("Seleccionar otra cuenta")',
+                        'a:has-text("SELECCIONAR OTRA CUENTA")',
+                        'a:has-text("Seleccionar otra cuenta")',
+                        'button:has-text("SELECCIONAR OTRA CUENTA")',
+                        '[data-test*="select-account"]',
+                        'a[href*="seleccionar"]'
+                    ]
+                    
+                    selection_clicked = False
+                    for selector in account_selection_selectors:
+                        try:
+                            if page.locator(selector).is_visible(timeout=3000):
+                                self._click(selector)
+                                logger.info(f"Clicked account selection with selector: {selector}")
+                                selection_clicked = True
+                                break
+                        except Exception:
+                            continue
+                    
+                    if not selection_clicked:
+                        logger.warning("Could not find 'select another account' button, trying navigation workaround")
+                        # Alternative: navigate back to the movements section
+                        try:
+                            self._click('a[href="#/movimientos/cuenta/saldos-movimientos"]')
+                        except Exception:
+                            self._click('button:has-text("Mis Productos")')
+                            self._click('a[href="#/movimientos/cuenta/saldos-movimientos"]')
+                    
+                    # Wait for account selection modal with more flexible selectors
+                    modal_selectors = [
+                        'h2:has-text("Seleccione una cuenta")',
+                        'h1:has-text("Seleccione una cuenta")',
+                        '.modal-title:has-text("Seleccione")',
+                        'mat-select[name="monedas"]'
+                    ]
+                    
+                    modal_found = False
+                    for selector in modal_selectors:
+                        try:
+                            self._wait_for_selector(selector, timeout_override=10000)
+                            logger.info(f"Found account selection modal with selector: {selector}")
+                            modal_found = True
+                            break
+                        except Exception:
+                            continue
+                    
+                    if not modal_found:
+                        logger.warning("Could not find account selection modal, continuing anyway")
 
                     # If there are more accounts for the same currency, we need to reselect the currency
                     # to have the list of accounts ready for the next iteration.
