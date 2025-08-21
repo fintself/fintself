@@ -13,7 +13,7 @@ load_dotenv()
 # List of all banks you want to process
 BANKS_TO_SCRAPE = [
     "cl_santander",
-    # "cl_banco_chile",
+    "cl_banco_chile",
     "cl_cencosud"
 ]
 
