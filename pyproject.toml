@@ -1,0 +1,68 @@
+[project]
+name = "fintself"
+version = "0.1.0"
+description = "Scraper de movimientos bancarios open source y colaborativo."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "loguru>=0.7.3",
+    "openpyxl>=3.1.5",
+    "pandas>=2.3.1",
+    "python-dotenv>=1.1.1",
+    "playwright>=1.42.0",
+    "pydantic>=2.11.7",
+    "typer>=0.16.0",
+]
+
+[project.scripts]
+fintself = "fintself.cli:app"
+
+[tool.setuptools.packages.find]
+include = ["fintself*"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.4.1",
+    "pytest-mock>=3.14.1",
+    "ipykernel>=6.30.0",
+    "ipywidgets>=8.1.7",
+]
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+build_command = "uv build"
+commit_parser = "conventional"
+major_on_zero = false
+tag_format = "v{version}"
+
+[tool.semantic_release.branches.main]
+match = "(main|master)"
+prerelease = false
+
+[tool.semantic_release.changelog]
+changelog_file = "CHANGELOG.md"
+exclude_commit_patterns = [
+    '''chore(?:\([^)]*?\))?: .+''',
+    '''ci(?:\([^)]*?\))?: .+''',
+    '''docs(?:\([^)]*?\))?: .+''',
+    '''refactor(?:\([^)]*?\))?: .+''',
+    '''style(?:\([^)]*?\))?: .+''',
+    '''test(?:\([^)]*?\))?: .+''',
+    '''build\((?!deps\): .+)''',
+    '''Initial [Cc]ommit.*''',
+]
+
+[tool.semantic_release.commit_parser_options]
+minor_tags = ["feat"]
+patch_tags = ["fix", "perf"]
+allowed_tags = ["feat", "fix", "perf", "build", "chore", "ci", "docs", "style", "refactor", "test"]
+
+[tool.semantic_release.publish]
+dist_glob_patterns = ["dist/*"]
+upload_to_vcs_release = true
+
+[dependency-groups]
+dev = [
+    "python-semantic-release>=10.2.0",
+    "ruff>=0.12.6",
+]
