@@ -216,3 +216,7 @@ __marimo__/
 
 # Data
 outputs
+
+# Local development files (keep only locally)
+docs/
+CLAUDE.md
