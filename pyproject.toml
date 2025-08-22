@@ -1,7 +1,7 @@
 [project]
 name = "fintself"
 version = "1.0.1"
-description = "Scraper de movimientos bancarios open source y colaborativo."
+description = "Open source collaborative bank transaction scraper for Chilean banks."
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
