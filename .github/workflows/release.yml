@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - feature/first-commit
 
 permissions:
   contents: read
