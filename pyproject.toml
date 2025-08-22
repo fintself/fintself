@@ -1,6 +1,6 @@
 [project]
 name = "fintself"
-version = "0.1.0"
+version = "1.0.0"
 description = "Scraper de movimientos bancarios open source y colaborativo."
 readme = "README.md"
 requires-python = ">=3.9"
