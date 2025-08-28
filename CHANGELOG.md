@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.0.3 (2025-08-28)
+
+### Bug Fixes
+
+- Add missing MIT license file ([#6](https://github.com/fintself/fintself/pull/6),
+  [`252233b`](https://github.com/fintself/fintself/commit/252233bb1f82de84ad968f8d403c57b75c81f778))
+
+
 ## v1.0.2 (2025-08-22)
 
 ### Bug Fixes
