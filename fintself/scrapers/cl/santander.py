@@ -404,6 +404,9 @@ class SantanderScraper(BaseScraper):
                         f"-{charge}" if charge and charge not in ["0", ""] else payment
                     )
                 else:
+                    # For billed movements, use the amount as-is from the website
+                    # Don't invert signs - positive amounts should stay positive (credits)
+                    # and negative amounts should stay negative (charges)
                     raw_movement["amount"] = (
                         row.locator("td.mat-column-amount")
                         .inner_text(timeout=5000)
