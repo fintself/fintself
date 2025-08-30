@@ -54,10 +54,26 @@ class BancoChileScraper(BaseScraper):
         element = self._find_element_with_fallbacks(selectors, timeout)
         if element:
             try:
+                # Try direct click first
                 element.click()
                 return True
             except Exception as e:
-                logger.warning(f"Failed to click element: {e}")
+                logger.warning(f"Failed direct click: {e}")
+                # Try JavaScript click as fallback
+                try:
+                    page = self._ensure_page()
+                    page.evaluate("el => el.click()", element)
+                    logger.info("Successfully clicked using JavaScript")
+                    return True
+                except Exception as e2:
+                    logger.warning(f"Failed JavaScript click: {e2}")
+                    # Try force click as last resort
+                    try:
+                        element.click(force=True)
+                        logger.info("Successfully clicked with force")
+                        return True
+                    except Exception as e3:
+                        logger.warning(f"Failed force click: {e3}")
         return False
 
     def _type_with_fallbacks(self, selectors: List[str], text: str, timeout: int = 5000) -> bool:
@@ -323,6 +339,43 @@ class BancoChileScraper(BaseScraper):
                 raise
             self._save_debug_info("post_login_unexpected_error")
             raise LoginError(f"Unexpected error during login verification: {str(e)}")
+
+    def _dismiss_overlays(self) -> None:
+        """Dismiss any overlays that might block clicks."""
+        page = self._ensure_page()
+        
+        try:
+            # Look for common overlay elements
+            overlay_selectors = [
+                '.cdk-overlay-backdrop',
+                '.fondo',
+                '.overlay',
+                '.modal-backdrop',
+                '[class*="backdrop"]'
+            ]
+            
+            for selector in overlay_selectors:
+                try:
+                    overlays = page.locator(selector)
+                    if overlays.count() > 0:
+                        logger.info(f"Found overlay with selector: {selector}")
+                        # Try to click outside or dismiss
+                        try:
+                            # Click the overlay to dismiss it
+                            overlays.first.click(timeout=1000)
+                            page.wait_for_timeout(500)
+                        except:
+                            # Try pressing Escape
+                            try:
+                                page.keyboard.press("Escape")
+                                page.wait_for_timeout(500)
+                            except:
+                                pass
+                except Exception:
+                    continue
+                    
+        except Exception as e:
+            logger.debug(f"Error dismissing overlays: {e}")
 
     def _close_popup(self) -> None:
         """Closes the initial marketing popup if it appears."""
@@ -620,8 +673,49 @@ class BancoChileScraper(BaseScraper):
         page = self._ensure_page()
         all_movements: List[MovementModel] = []
 
+        # Wait longer for the page to fully load after login
+        page.wait_for_timeout(5000)
+        
         # Close any popup that might interfere
         self._close_popup()
+
+        # Extract account movements (debit accounts)
+        logger.info("Extracting account movements")
+        account_movements = self._scrape_account_movements()
+        all_movements.extend(account_movements)
+
+        # Extract credit card movements  
+        logger.info("Extracting credit card movements")
+        credit_card_movements = self._scrape_credit_card_movements()
+        all_movements.extend(credit_card_movements)
+
+        logger.info(f"Scraping completed. Total movements extracted: {len(all_movements)}")
+        
+        # Validate movements before returning
+        if all_movements:
+            # Check for duplicates based on date, description, and amount
+            seen_movements = set()
+            unique_movements = []
+            
+            for movement in all_movements:
+                movement_key = (movement.date, movement.description, movement.amount, movement.account_id)
+                if movement_key not in seen_movements:
+                    seen_movements.add(movement_key)
+                    unique_movements.append(movement)
+                else:
+                    logger.debug(f"Duplicate movement detected and removed: {movement.description}")
+            
+            if len(unique_movements) != len(all_movements):
+                logger.info(f"Removed {len(all_movements) - len(unique_movements)} duplicate movements")
+            
+            return unique_movements
+        
+        return all_movements
+
+    def _scrape_account_movements(self) -> List[MovementModel]:
+        """Scrapes debit account movements from the Saldos y Movimientos section."""
+        page = self._ensure_page()
+        movements: List[MovementModel] = []
 
         logger.info("Navigating to 'Saldos y Movimientos' section.")
         
@@ -634,18 +728,61 @@ class BancoChileScraper(BaseScraper):
         
         page.wait_for_timeout(2000)  # Wait for menu to appear
         
+        # Try to dismiss any overlays that might be blocking clicks
+        self._dismiss_overlays()
+        
+        # Try multiple approaches to navigate to movements section
+        navigation_successful = False
+        
+        # Approach 1: Regular click with better selectors
         movements_selectors = [
             'a[href="#/movimientos/cuenta/saldos-movimientos"]',
             'a:has-text("Saldos y Movimientos")',
             'a:has-text("Movimientos")',
             '.movements-link'
         ]
-        movements_clicked = self._click_with_fallbacks(movements_selectors, timeout=10000)
+        movements_clicked = self._click_with_fallbacks(movements_selectors, timeout=8000)
         
-        if not movements_clicked:
-            raise DataExtractionError("Could not find 'Saldos y Movimientos' link")
+        if movements_clicked:
+            page.wait_for_timeout(3000)
+            navigation_successful = True
+            logger.info("Successfully navigated to movements section using regular click")
+        
+        # Approach 2: JavaScript navigation as fallback
+        if not navigation_successful:
+            try:
+                logger.info("Trying JavaScript navigation fallback")
+                page.evaluate("window.location.hash = '#/movimientos/cuenta/saldos-movimientos'")
+                page.wait_for_timeout(3000)
+                navigation_successful = True
+                logger.info("Successfully navigated to movements section using JavaScript")
+            except Exception as e:
+                logger.warning(f"JavaScript navigation failed: {e}")
+        
+        # Approach 3: Direct URL navigation
+        if not navigation_successful:
+            try:
+                logger.info("Trying direct URL navigation")
+                current_url = page.url
+                base_url = current_url.split('#')[0]  # Remove existing hash
+                new_url = f"{base_url}#/movimientos/cuenta/saldos-movimientos"
+                page.goto(new_url, wait_until="domcontentloaded", timeout=15000)
+                page.wait_for_timeout(3000)
+                navigation_successful = True
+                logger.info("Successfully navigated using direct URL")
+            except Exception as e:
+                logger.warning(f"Direct URL navigation failed: {e}")
+        
+        if not navigation_successful:
+            logger.warning("All navigation approaches failed, continuing anyway to test credit cards")
+            # Don't raise error here, just continue to credit cards
             
         self._save_debug_info("05_movements_section_clicked")
+
+        # Only proceed with account movements if navigation was successful
+        if not navigation_successful:
+            logger.warning("Skipping account movements extraction due to navigation failure")
+            return []
 
         # Wait for account selection modal with improved selectors
         modal_selectors = [
@@ -667,7 +804,8 @@ class BancoChileScraper(BaseScraper):
         
         if not modal_found:
             self._save_debug_info("account_selection_modal_not_found")
-            raise DataExtractionError("Account selection modal did not appear")
+            logger.warning("Account selection modal did not appear, skipping account movements")
+            return []
             
         self._save_debug_info("06_account_selection_modal_opened")
 
@@ -813,10 +951,10 @@ class BancoChileScraper(BaseScraper):
                     logger.error("Could not find or click accept button")
                     continue
 
-                movements = self._extract_movements_from_table(
+                account_movements = self._extract_movements_from_table(
                     currency_code, account_id
                 )
-                all_movements.extend(movements)
+                movements.extend(account_movements)
 
                 is_last_overall_account = (i_currency == len(currency_texts) - 1) and (
                     i_account == len(account_labels) - 1
@@ -935,25 +1073,312 @@ class BancoChileScraper(BaseScraper):
                             logger.warning(f"Error reselecting currency: {e}")
                             # Continue anyway, might still work
 
-        logger.info(f"Scraping completed. Total movements extracted: {len(all_movements)}")
+        logger.info(f"Account movements extracted: {len(movements)}")
+        return movements
+
+    def _scrape_credit_card_movements(self) -> List[MovementModel]:
+        """Scrapes credit card movements from both non-invoiced and invoiced sections."""
+        page = self._ensure_page()
+        movements: List[MovementModel] = []
+
+        logger.info("Navigating to credit card section")
+
+        try:
+            # Navigate to main menu
+            products_selectors = ['button:has-text("Mis Productos")', 'a:has-text("Mis Productos")', '.main-menu-products']
+            products_clicked = self._click_with_fallbacks(products_selectors, timeout=10000)
+            
+            if not products_clicked:
+                logger.warning("Could not find 'Mis Productos' menu for credit card")
+                return []
+            
+            page.wait_for_timeout(2000)
+            
+            # Click on "Tarjeta de Crédito" button
+            credit_card_selectors = [
+                'button[id="41300"]:has-text("Tarjeta de Crédito")',
+                'button:has-text("Tarjeta de Crédito")',
+                'a:has-text("Tarjeta de Crédito")',
+                '.credit-card-menu'
+            ]
+            
+            credit_card_clicked = self._click_with_fallbacks(credit_card_selectors, timeout=10000)
+            if not credit_card_clicked:
+                logger.warning("Could not find 'Tarjeta de Crédito' menu")
+                return []
+            
+            page.wait_for_timeout(2000)
+            self._save_debug_info("07_credit_card_menu_opened")
+
+            # Extract movements from non-invoiced section
+            non_invoiced_movements = self._extract_credit_card_movements_section(
+                section_type="no-facturados",
+                link_selector='a[href="#/tarjeta-credito/consultar/saldos"]',
+                link_text="Saldos y Movimientos No Facturados"
+            )
+            movements.extend(non_invoiced_movements)
+
+            # Extract movements from invoiced section  
+            invoiced_movements = self._extract_credit_card_movements_section(
+                section_type="facturados", 
+                link_selector='a[href="#/tarjeta-credito/consultar/facturados"]',
+                link_text="Movimientos Facturados"
+            )
+            movements.extend(invoiced_movements)
+
+        except Exception as e:
+            logger.warning(f"Error extracting credit card movements: {e}")
+            self._save_debug_info("credit_card_error")
+
+        logger.info(f"Credit card movements extracted: {len(movements)}")
+        return movements
+
+    def _extract_credit_card_movements_section(self, section_type: str, link_selector: str, link_text: str) -> List[MovementModel]:
+        """Extracts credit card movements from a specific section (invoiced or non-invoiced)."""
+        page = self._ensure_page()
+        movements: List[MovementModel] = []
         
-        # Validate movements before returning
-        if all_movements:
-            # Check for duplicates based on date, description, and amount
-            seen_movements = set()
-            unique_movements = []
-            
-            for movement in all_movements:
-                movement_key = (movement.date, movement.description, movement.amount, movement.account_id)
-                if movement_key not in seen_movements:
-                    seen_movements.add(movement_key)
-                    unique_movements.append(movement)
-                else:
-                    logger.debug(f"Duplicate movement detected and removed: {movement.description}")
-            
-            if len(unique_movements) != len(all_movements):
-                logger.info(f"Removed {len(all_movements) - len(unique_movements)} duplicate movements")
-            
-            return unique_movements
+        logger.info(f"Extracting {section_type} credit card movements")
         
-        return all_movements
+        try:
+            # Navigate to the specific section
+            section_selectors = [
+                link_selector,
+                f'a:has-text("{link_text}")',
+                f'.{section_type}-link'
+            ]
+            
+            section_clicked = self._click_with_fallbacks(section_selectors, timeout=10000)
+            if not section_clicked:
+                logger.warning(f"Could not navigate to {section_type} section")
+                return []
+            
+            page.wait_for_timeout(3000)
+            self._save_debug_info(f"08_{section_type}_section_opened")
+            
+            # Extract from Nacional tab
+            nacional_movements = self._extract_credit_card_tab_movements("Nacional", section_type)
+            movements.extend(nacional_movements)
+            
+            # Extract from Internacional tab
+            internacional_movements = self._extract_credit_card_tab_movements("Internacional", section_type)
+            movements.extend(internacional_movements)
+            
+        except Exception as e:
+            logger.warning(f"Error extracting {section_type} movements: {e}")
+        
+        return movements
+
+    def _extract_credit_card_tab_movements(self, tab_name: str, section_type: str) -> List[MovementModel]:
+        """Extracts movements from a specific tab (Nacional/Internacional) within a credit card section."""
+        page = self._ensure_page()
+        movements: List[MovementModel] = []
+        
+        logger.info(f"Extracting {tab_name} movements from {section_type} section")
+        
+        try:
+            # Click on the tab
+            tab_selectors = [
+                f'div.mat-tab-label:has-text("{tab_name}")',
+                f'button:has-text("{tab_name}")',
+                f'.mat-tab-label:has-text("{tab_name}")'
+            ]
+            
+            tab_clicked = self._click_with_fallbacks(tab_selectors, timeout=5000)
+            if not tab_clicked:
+                logger.info(f"Could not find {tab_name} tab, might be already selected")
+            
+            page.wait_for_timeout(2000)
+            self._save_debug_info(f"09_{section_type}_{tab_name}_tab")
+            
+            # Check for "no information" message
+            no_data_selectors = [
+                "div.bch-alert:has-text('No existe información')",
+                "div.alert:has-text('No existe')",
+                "div:has-text('No hay movimientos')",
+                "div:has-text('Sin movimientos')",
+                ".no-data",
+                ".empty-state"
+            ]
+            
+            no_data_element = self._find_element_with_fallbacks(no_data_selectors, timeout=3000)
+            if no_data_element:
+                logger.info(f"No {tab_name} movements found in {section_type} section")
+                return []
+            
+            # Extract movements from table
+            movements = self._extract_credit_card_movements_from_table(tab_name, section_type)
+            
+        except Exception as e:
+            logger.warning(f"Error extracting {tab_name} tab movements from {section_type}: {e}")
+        
+        return movements
+
+    def _extract_credit_card_movements_from_table(self, currency: str, section_type: str) -> List[MovementModel]:
+        """Extracts credit card movements from the currently displayed table."""
+        page = self._ensure_page()
+        movements: List[MovementModel] = []
+        
+        try:
+            # Wait for table to load
+            table_selectors = [
+                "table.bch-table",
+                "table:has(tbody tr)",
+                ".movements-table"
+            ]
+            
+            table_found = False
+            for selector in table_selectors:
+                try:
+                    page.wait_for_selector(selector, timeout=8000)
+                    table_found = True
+                    break
+                except PlaywrightTimeoutError:
+                    continue
+            
+            if not table_found:
+                logger.info(f"No table found for {currency} movements in {section_type}")
+                return []
+            
+            # Get table rows (excluding collapse/detail rows)
+            row_selector = "table.bch-table tbody tr.bch-row:not(.table-collapse-row)"
+            rows = page.locator(row_selector).all()
+            
+            if not rows:
+                logger.info(f"No movement rows found for {currency} in {section_type}")
+                return []
+            
+            logger.info(f"Found {len(rows)} credit card movement rows for {currency} in {section_type}")
+            
+            for i, row in enumerate(rows):
+                try:
+                    # Extract data from row columns based on the HTML structure provided
+                    date_selectors = ["td.cdk-column-fechaTransaccion", "td:nth-child(1)"]
+                    type_selectors = ["td.cdk-column-tipoMovimientoLabel", "td:nth-child(2)"] 
+                    desc_selectors = ["td.cdk-column-descripcion", "td:nth-child(3)"]
+                    cuotas_selectors = ["td.cdk-column-cuotas", "td:nth-child(4)"]
+                    cargo_selectors = ["td.cdk-column-cargo", "td:nth-child(5)"]
+                    pago_selectors = ["td.cdk-column-pago", "td:nth-child(6)"]
+                    
+                    # Find elements within this specific row
+                    date_element = None
+                    desc_element = None
+                    tipo_element = None
+                    cuotas_element = None
+                    cargo_element = None
+                    pago_element = None
+                    
+                    for sel in date_selectors:
+                        candidate = row.locator(sel)
+                        if candidate.count() > 0:
+                            date_element = candidate
+                            break
+                    
+                    for sel in desc_selectors:
+                        candidate = row.locator(sel)
+                        if candidate.count() > 0:
+                            desc_element = candidate
+                            break
+                    
+                    for sel in type_selectors:
+                        candidate = row.locator(sel)
+                        if candidate.count() > 0:
+                            tipo_element = candidate
+                            break
+                    
+                    for sel in cuotas_selectors:
+                        candidate = row.locator(sel)
+                        if candidate.count() > 0:
+                            cuotas_element = candidate
+                            break
+                    
+                    for sel in cargo_selectors:
+                        candidate = row.locator(sel)
+                        if candidate.count() > 0:
+                            cargo_element = candidate
+                            break
+                    
+                    for sel in pago_selectors:
+                        candidate = row.locator(sel)
+                        if candidate.count() > 0:
+                            pago_element = candidate
+                            break
+                    
+                    if not all([date_element, desc_element]):
+                        logger.warning(f"Could not find required elements in credit card row {i+1}")
+                        continue
+                    
+                    # Extract text content
+                    date_str = date_element.inner_text().strip() if date_element else ""
+                    description = desc_element.inner_text().strip() if desc_element else ""
+                    tipo_str = tipo_element.inner_text().strip() if tipo_element else ""
+                    cuotas_str = cuotas_element.inner_text().strip() if cuotas_element else ""
+                    cargo_str = cargo_element.inner_text().strip() if cargo_element else ""
+                    pago_str = pago_element.inner_text().strip() if pago_element else ""
+                    
+                    # Parse date
+                    date = parse_chilean_date(date_str)
+                    if not date:
+                        logger.warning(f"Could not parse date '{date_str}' in credit card row {i+1}")
+                        continue
+                    
+                    # Determine amount and transaction type
+                    amount_str = ""
+                    transaction_type = "Credit Card"
+                    
+                    if cargo_str.strip() and cargo_str.strip() != "-" and cargo_str.strip() != "0":
+                        amount_str = f"-{cargo_str.strip()}"  # Negative for charges
+                        if tipo_str:
+                            transaction_type = f"Credit Card - {tipo_str}"
+                    elif pago_str.strip() and pago_str.strip() != "-" and pago_str.strip() != "0":
+                        amount_str = pago_str.strip()  # Positive for payments
+                        transaction_type = "Credit Card - Payment"
+                    else:
+                        logger.debug(f"Credit card row {i+1} has no valid amount, skipping")
+                        continue
+                    
+                    amount = parse_chilean_amount(amount_str)
+                    if amount.is_zero():
+                        logger.debug(f"Credit card row {i+1} has zero amount, skipping")
+                        continue
+                    
+                    # Create enhanced description
+                    enhanced_desc = description
+                    if cuotas_str and cuotas_str != "-":
+                        enhanced_desc += f" (Cuotas: {cuotas_str})"
+                    
+                    # Determine account type and currency
+                    account_type = "credito"
+                    currency_code = "CLP" if currency == "Nacional" else "USD"
+                    account_id = f"credit_card_{currency.lower()}_{section_type}"
+                    
+                    # Create movement
+                    movement = MovementModel(
+                        date=date,
+                        description=enhanced_desc,
+                        amount=amount,
+                        currency=currency_code,
+                        transaction_type=transaction_type,
+                        account_id=account_id,
+                        account_type=account_type,
+                        raw_data={
+                            "date_str": date_str,
+                            "tipo_movimiento": tipo_str,
+                            "cuotas": cuotas_str,
+                            "cargo_str": cargo_str,
+                            "pago_str": pago_str,
+                            "section_type": section_type,
+                            "currency_type": currency,
+                            "row_index": i + 1,
+                        },
+                    )
+                    movements.append(movement)
+                    logger.debug(f"Added credit card movement: {enhanced_desc[:50]}... Amount: {amount} {currency_code}")
+                    
+                except Exception as e:
+                    logger.warning(f"Failed to parse credit card row {i+1}: {e}")
+            
+        except Exception as e:
+            logger.warning(f"Error extracting credit card movements from table: {e}")
+        
+        return movements
