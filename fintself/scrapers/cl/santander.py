@@ -26,7 +26,7 @@ class SantanderScraper(BaseScraper):
         """Implements the login logic for Santander Chile."""
         assert self.user is not None, "User must be provided"
         assert self.password is not None, "Password must be provided"
-        
+
         page = self._ensure_page()
         logger.info("Navigating to Santander login page.")
         self._navigate(self.LOGIN_URL, timeout_override=90000)
@@ -404,14 +404,24 @@ class SantanderScraper(BaseScraper):
                         f"-{charge}" if charge and charge not in ["0", ""] else payment
                     )
                 else:
-                    # For billed movements, use the amount as-is from the website
-                    # Don't invert signs - positive amounts should stay positive (credits)
-                    # and negative amounts should stay negative (charges)
-                    raw_movement["amount"] = (
+                    # For billed movements, Santander shows:
+                    # - Expenses (gastos) as positive values - we need them negative
+                    # - Refunds (reembolsos) as negative values - we need them positive
+                    # So we invert the sign to match the expected behavior
+                    amount_text = (
                         row.locator("td.mat-column-amount")
                         .inner_text(timeout=5000)
                         .strip()
                     )
+                    # Parse the amount to check if it's positive or negative
+                    if amount_text.startswith("-"):
+                        # Negative amount (refund) - make it positive
+                        raw_movement["amount"] = amount_text[
+                            1:
+                        ]  # Remove the minus sign
+                    else:
+                        # Positive amount (expense) - make it negative
+                        raw_movement["amount"] = f"-{amount_text}"
 
                 parsed_date = parse_chilean_date(raw_movement.get("date"))
                 if not parsed_date:
