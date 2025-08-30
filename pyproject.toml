@@ -1,7 +1,7 @@
 [project]
 name = "fintself"
-version = "0.1.0"
-description = "Scraper de movimientos bancarios open source y colaborativo."
+version = "1.0.3"
+description = "Open source collaborative bank transaction scraper for Chilean banks."
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
@@ -30,7 +30,7 @@ dev = [
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
-build_command = "uv build"
+build_command = "pip install uv && uv build"
 commit_parser = "conventional"
 major_on_zero = false
 tag_format = "v{version}"
