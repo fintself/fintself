@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v1.1.0 (2025-08-30)
+
+### Bug Fixes
+
+- Correct sign handling for billed credit card movements in santander scraper
+  ([`9649f5b`](https://github.com/fintself/fintself/commit/9649f5b34c5884eb7ebd2320f3839d033c463972))
+
+- Invert sign logic for santander billed transactions
+  ([`391eda6`](https://github.com/fintself/fintself/commit/391eda67ed659859d0505e4ec9b4daba1e4e017d))
+
+
 ## v1.0.3 (2025-08-28)
 
 ### Bug Fixes
