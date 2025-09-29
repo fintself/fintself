@@ -37,3 +37,9 @@ SCRAPER_MIN_HUMAN_DELAY_MS = float(
 SCRAPER_MAX_HUMAN_DELAY_MS = float(
     os.getenv("SCRAPER_MAX_HUMAN_DELAY_MS", "800.0")
 )  # ms
+
+# Bank-specific filters
+# Comma-separated list of Santander credit card last4s to scrape (e.g., "9722,9753").
+CL_SANTANDER_CC_LAST4S = [
+    s.strip() for s in os.getenv("CL_SANTANDER_CC_LAST4S", "").split(",") if s.strip()
+]
