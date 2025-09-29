@@ -362,14 +362,21 @@ class SantanderScraper(BaseScraper):
                 self._save_debug_info("08_dashboard_for_debit_usd")
 
                 logger.info("Navigating to USD Checking Account movements...")
-                # This locator targets the USD checking account by finding the second "Disponible" text
-                # within the "Cuentas" region.
-                usd_account_card_locator = (
-                    page.get_by_label("Cuentas").get_by_text("Disponible").nth(1)
+                cuentas_section = page.locator("#cuentas")
+                # Prefer selecting by the stored account number's last digits
+                last4 = usd_detected_id[-4:] if len(usd_detected_id) >= 4 else usd_detected_id
+                usd_tile = cuentas_section.locator(
+                    f"div.box-product:has-text('{last4}')"
                 )
+                if usd_tile.count() == 0:
+                    # Fallback: try to match the word for dollars
+                    usd_tile = cuentas_section.locator("div.box-product:has-text('ólar')")
+                if usd_tile.count() == 0:
+                    # Fallback 2: previous heuristic (second 'Disponible')
+                    usd_tile = page.get_by_label("Cuentas").get_by_text("Disponible").nth(1)
 
-                if usd_account_card_locator.count() > 0:
-                    self._click(usd_account_card_locator)
+                if usd_tile.count() > 0:
+                    self._click(usd_tile.first)
                     self._wait_for_selector(
                         "text=Mis movimientos", timeout_override=20000
                     )
@@ -378,7 +385,7 @@ class SantanderScraper(BaseScraper):
                         self._extract_debit_card_movements(currency="USD")
                     )
                 else:
-                    logger.warning("USD Checking Account not found. Skipping.")
+                    logger.warning("USD Checking Account tile not found. Skipping.")
             except Exception as e:
                 logger.error(
                     f"Error scraping USD Checking Account movements: {e}", exc_info=True
