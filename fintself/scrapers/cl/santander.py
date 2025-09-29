@@ -326,14 +326,36 @@ class SantanderScraper(BaseScraper):
             self._save_debug_info("06_dashboard_for_debit_clp")
 
             logger.info("Navigating to CLP Checking Account movements...")
-            # This locator targets the main checking account summary card.
-            # The name contains a special character from an icon font.
-            checking_account_card_locator = (
-                page.get_by_role("region", name="Cuentas ")
-                .get_by_role("emphasis")
-                .first
-            )
-            self._click(checking_account_card_locator)
+            cuentas_section = page.locator("#cuentas")
+            clp_detected_id = self.account_ids.get("corriente", {}).get("CLP")
+            clp_tile = None
+            if cuentas_section.count() > 0 and clp_detected_id:
+                try:
+                    last4 = (
+                        clp_detected_id[-4:]
+                        if isinstance(clp_detected_id, str) and len(clp_detected_id) >= 4
+                        else str(clp_detected_id)
+                    )
+                    candidate = cuentas_section.locator(
+                        f"div.box-product:has-text('{last4}')"
+                    )
+                    if candidate.count() > 0:
+                        clp_tile = candidate.first
+                except Exception:
+                    clp_tile = None
+
+            if clp_tile is None:
+                # Fallback to previous heuristic
+                logger.info(
+                    "CLP account tile not matched by ID. Using default tile selection."
+                )
+                clp_tile = (
+                    page.get_by_role("region", name="Cuentas ")
+                    .get_by_role("emphasis")
+                    .first
+                )
+
+            self._click(clp_tile)
             self._wait_for_selector("text=Mis movimientos", timeout_override=20000)
             self._save_debug_info("07_debit_clp_movements_page")
 
