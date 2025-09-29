@@ -142,31 +142,42 @@ class SantanderScraper(BaseScraper):
             )
             all_movements.extend(self._scrape_credit_cards_by_last4(cc_filter))
         else:
-            # Fallback to previous behavior: scrape current (default) credit card context only
-            # Credit Card: Unbilled
-            logger.info("--- Starting extraction of Unbilled CC ---")
-            self._navigate(self.UNBILLED_URL, timeout_override=60000)
-            self._save_debug_info("04_unbilled_page")
-            all_movements.extend(
-                self._extract_credit_card_movements("no_facturados", "CLP")
+            # No filter provided: iterate all visible credit cards from dashboard
+            logger.info(
+                "No credit card filter provided. Iterating all visible credit cards."
             )
-            self._switch_currency_tab("USD")
-            all_movements.extend(
-                self._extract_credit_card_movements("no_facturados", "USD")
-            )
+            all_last4s = self._get_all_credit_card_last4s()
+            if all_last4s:
+                all_movements.extend(self._scrape_credit_cards_by_last4(all_last4s))
+            else:
+                # Fallback to previous behavior: scrape current (default) credit card context only
+                logger.warning(
+                    "Could not list credit cards; scraping the default/first card context only."
+                )
+                # Credit Card: Unbilled
+                logger.info("--- Starting extraction of Unbilled CC ---")
+                self._navigate(self.UNBILLED_URL, timeout_override=60000)
+                self._save_debug_info("04_unbilled_page")
+                all_movements.extend(
+                    self._extract_credit_card_movements("no_facturados", "CLP")
+                )
+                self._switch_currency_tab("USD")
+                all_movements.extend(
+                    self._extract_credit_card_movements("no_facturados", "USD")
+                )
 
-            # Credit Card: Billed
-            logger.info("--- Starting extraction of Billed CC ---")
-            self._navigate(self.BILLED_URL, timeout_override=60000)
-            self._save_debug_info("05_billed_page")
-            self._switch_currency_tab("CLP")
-            all_movements.extend(
-                self._extract_credit_card_movements("facturados", "CLP")
-            )
-            self._switch_currency_tab("USD")
-            all_movements.extend(
-                self._extract_credit_card_movements("facturados", "USD")
-            )
+                # Credit Card: Billed
+                logger.info("--- Starting extraction of Billed CC ---")
+                self._navigate(self.BILLED_URL, timeout_override=60000)
+                self._save_debug_info("05_billed_page")
+                self._switch_currency_tab("CLP")
+                all_movements.extend(
+                    self._extract_credit_card_movements("facturados", "CLP")
+                )
+                self._switch_currency_tab("USD")
+                all_movements.extend(
+                    self._extract_credit_card_movements("facturados", "USD")
+                )
 
         # Debit Card (Checking Account)
         all_movements.extend(self._scrape_debit_card_movements())
@@ -175,6 +186,59 @@ class SantanderScraper(BaseScraper):
             f"Scraping completed. Total movements extracted: {len(all_movements)}"
         )
         return all_movements
+
+    def _get_all_credit_card_last4s(self) -> List[str]:
+        """Returns the list of last-4 digits for all visible credit cards on the dashboard."""
+        page = self._ensure_page()
+        last4s: List[str] = []
+        try:
+            # Ensure we're on the dashboard
+            self._navigate(self.DASHBOARD_URL, timeout_override=60000)
+            expect(page.locator("h3:has-text('Hola')")).to_be_visible(timeout=40000)
+            self._save_debug_info("dashboard_for_all_credit_cards")
+
+            # Expand credit cards section if needed
+            credit_cards_section = page.locator("#tarjetas-creditos")
+            if credit_cards_section.count() == 0:
+                logger.warning("Credit cards section not found on dashboard.")
+                return []
+
+            view_all = credit_cards_section.locator("text=Ver todas")
+            if view_all.count() > 0:
+                logger.info("'Ver todas' found in credit cards section. Expanding…")
+                self._click(view_all.first)
+                page.wait_for_timeout(500)
+
+            card_divs = credit_cards_section.locator("div.box-product").all()
+            for div in card_divs:
+                try:
+                    card_text = (
+                        div.locator("p:has-text('*')").inner_text(timeout=1500)
+                    )
+                    match = re.search(r"\*\s*(\d{4})", card_text)
+                    if match:
+                        last4s.append(match.group(1))
+                except Exception:
+                    continue
+
+            # Deduplicate preserving order
+            seen = set()
+            unique_last4s = []
+            for x in last4s:
+                if x not in seen:
+                    unique_last4s.append(x)
+                    seen.add(x)
+
+            logger.info(
+                f"Found credit cards (last4): {', '.join(unique_last4s) if unique_last4s else 'none'}"
+            )
+            return unique_last4s
+        except Exception as e:
+            logger.warning(
+                f"Could not list credit cards from dashboard: {e}", exc_info=True
+            )
+            self._save_debug_info("list_credit_cards_failed")
+            return []
 
     def _scrape_credit_cards_by_last4(self, last4_list: List[str]) -> List[MovementModel]:
         """Iterates over dashboard credit cards matching provided last4s and scrapes their movements."""
