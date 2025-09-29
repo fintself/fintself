@@ -486,6 +486,17 @@ class SantanderScraper(BaseScraper):
         logger.info(f"Extracting debit card movements in {currency}...")
         account_id = self._get_account_id(account_type="corriente", currency=currency)
         container_selector = "div.card.table-container.show"
+        empty_state_selector = "div.card.sin-movimientos"
+
+        # Fast-path: detect empty-state card to avoid long waits
+        try:
+            if page.locator(empty_state_selector).count() > 0:
+                logger.info(
+                    f"No debit card movements in {currency} (empty-state card present)."
+                )
+                return []
+        except Exception:
+            pass
 
         try:
             self._wait_for_selector(container_selector, timeout_override=30000)
@@ -580,6 +591,22 @@ class SantanderScraper(BaseScraper):
             if status == "no_facturados"
             else "div.container-tabla"
         )
+        empty_state_selector = "div.card.sin-movimientos"
+
+        # Fast-path: handle empty-state message to avoid long waits
+        try:
+            # Short check for the "no movements" card
+            page.locator(empty_state_selector).first.wait_for(
+                state="visible", timeout=5000
+            )
+            logger.info(
+                f"No {status} credit card movements in {currency} (empty-state card)."
+            )
+            return []
+        except PlaywrightTimeoutError:
+            pass
+        except Exception:
+            pass
 
         try:
             self._wait_for_selector(container_selector, timeout_override=30000)
