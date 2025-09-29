@@ -43,17 +43,62 @@ class SantanderScraper(BaseScraper):
             login_frame.locator('role=textbox[name="RUT"]').wait_for(
                 state="visible", timeout=20000
             )
+            # Give the iframe a brief moment to finish mounting input masks
+            page.wait_for_timeout(400)
         except PlaywrightTimeoutError:
             self._save_debug_info("login_iframe_timeout")
             raise LoginError("Timeout waiting for Santander login iframe.")
 
         logger.info("Entering credentials.")
-        self._type(
-            login_frame.locator('role=textbox[name="RUT"]'), self.user, delay=120
-        )
-        self._type(
-            login_frame.locator('role=textbox[name="Clave"]'), self.password, delay=120
-        )
+        # Prefer fill with verification over typing to avoid partial input with masks
+        rut_input = login_frame.locator('role=textbox[name="RUT"]')
+        pwd_input = login_frame.locator('role=textbox[name="Clave"]')
+
+        try:
+            expect(rut_input).to_be_visible(timeout=20000)
+            expect(rut_input).to_be_editable(timeout=20000)
+        except PlaywrightTimeoutError:
+            self._save_debug_info("rut_input_not_editable")
+            raise LoginError("RUT input not editable in time.")
+
+        # Fill RUT with a short retry if it doesn't fully stick
+        def _digits(s: str) -> str:
+            return re.sub(r"\D", "", s or "")
+
+        for attempt in range(3):
+            rut_input.fill("", timeout=15000)
+            rut_input.fill(self.user, timeout=15000)
+            entered = rut_input.input_value(timeout=8000)
+            if _digits(entered) == _digits(self.user):
+                break
+            logger.warning(
+                f"RUT field mismatch after attempt {attempt+1}. Retrying..."
+            )
+            page.wait_for_timeout(300)
+        else:
+            self._save_debug_info("rut_input_mismatch")
+            raise LoginError(
+                "Could not reliably enter RUT in Santander login field."
+            )
+
+        # Fill password (single attempt should be fine), verify length
+        try:
+            expect(pwd_input).to_be_visible(timeout=20000)
+            expect(pwd_input).to_be_editable(timeout=20000)
+            pwd_input.fill("", timeout=15000)
+            pwd_input.fill(self.password, timeout=15000)
+            try:
+                if len(pwd_input.input_value(timeout=5000)) != len(self.password):
+                    logger.warning("Password length mismatch after fill. Retrying once...")
+                    page.wait_for_timeout(200)
+                    pwd_input.fill("", timeout=10000)
+                    pwd_input.fill(self.password, timeout=10000)
+            except Exception:
+                # Some inputs may not allow reading value; ignore in that case
+                pass
+        except PlaywrightTimeoutError:
+            self._save_debug_info("password_input_not_editable")
+            raise LoginError("Password input not editable in time.")
         self._save_debug_info("02_credentials_entered")
 
         logger.info("Submitting login form.")
