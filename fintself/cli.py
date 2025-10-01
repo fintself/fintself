@@ -1,4 +1,6 @@
 import os
+import shutil
+import subprocess
 from getpass import getpass
 from typing import Optional
 
@@ -23,6 +25,31 @@ app = typer.Typer(
     add_completion=False,
     rich_markup_mode="markdown",
 )
+
+
+def _terminate_chrome_profile_processes() -> None:
+    """Ensures no stale Chrome instance keeps the shared profile locked."""
+    pkill = shutil.which("pkill")
+    if not pkill:
+        logger.debug("Skipping Chrome cleanup because 'pkill' is unavailable.")
+        return
+
+    try:
+        result = subprocess.run(
+            [pkill, "-f", "google-chrome-fintself"],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        if result.returncode == 0:
+            logger.debug("Terminated existing google-chrome-fintself processes.")
+        else:
+            logger.debug(
+                "pkill google-chrome-fintself exited with code %s (likely none running).",
+                result.returncode,
+            )
+    except Exception as exc:
+        logger.warning(f"Unable to terminate google-chrome-fintself processes: {exc}")
 
 
 @app.command(name="list")
@@ -114,6 +141,7 @@ def scrape_bank_command(
         password = getpass(f"Password for {bank_id}: ")
 
     try:
+        _terminate_chrome_profile_processes()
         # Pass overrides to scraper factory. If None, settings from .env will be used.
         scraper = get_scraper(bank_id, headless=headless, debug_mode=debug_mode)
         movements = scraper.scrape(user=user, password=password)

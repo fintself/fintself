@@ -1,11 +1,17 @@
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
 AccountType = Literal["corriente", "credito", "debito", "prepago"]
+
+
+def _utcnow() -> datetime:
+    """Return a timezone-aware UTC timestamp."""
+
+    return datetime.now(timezone.utc)
 
 
 class MovementModel(BaseModel):
@@ -33,6 +39,10 @@ class MovementModel(BaseModel):
     )
     raw_data: Optional[dict] = Field(
         {}, description="Additional raw data from the scraper."
+    )
+    scraped_at: datetime = Field(
+        default_factory=_utcnow,
+        description="UTC timestamp when the movement was captured by the scraper.",
     )
 
     @field_validator("account_id", mode="before")
@@ -62,5 +72,6 @@ class MovementModel(BaseModel):
                     "original_desc": "COMPRA SUPERMERCADO LIDER",
                     "full_account_id": "1234-5678",
                 },
+                "scraped_at": "2023-10-26T10:05:00+00:00",
             }
         }
