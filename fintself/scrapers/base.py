@@ -1,5 +1,7 @@
 import datetime
+import json
 import os
+import platform
 import random
 import time
 from abc import ABC, abstractmethod
@@ -7,6 +9,7 @@ from typing import List, Literal, Optional, Union
 
 from playwright.sync_api import (
     Browser,
+    BrowserContext,
     Locator,
     Page,
     Playwright,
@@ -58,14 +61,20 @@ class BaseScraper(ABC):
         }
         self.locale = settings.SCRAPER_LOCALE
         self.timezone_id = settings.SCRAPER_TIMEZONE_ID
+        self.browser_channel = settings.SCRAPER_BROWSER_CHANNEL
+        self.browser_executable = settings.SCRAPER_BROWSER_EXECUTABLE
         self.min_human_delay_ms = settings.SCRAPER_MIN_HUMAN_DELAY_MS
         self.max_human_delay_ms = settings.SCRAPER_MAX_HUMAN_DELAY_MS
 
         self.playwright: Optional[Playwright] = None
         self.browser: Optional[Browser] = None
+        self.browser_context: Optional[BrowserContext] = None
         self.page: Optional[Page] = None
         self.user: Optional[str] = None
         self.password: Optional[str] = None
+        self._effective_user_agent: Optional[str] = None
+        self._user_agent_version: Optional[str] = None
+        self.chrome_user_data_dir = settings.SCRAPER_CHROME_USER_DATA_DIR
 
     @abstractmethod
     def _get_bank_id(self) -> str:
@@ -109,6 +118,174 @@ class BaseScraper(ABC):
         )
         logger.trace(f"Applying human delay: {delay_seconds:.3f} seconds.")
         time.sleep(delay_seconds)
+
+    def _platform_token(self) -> str:
+        """Returns the user-agent platform token matching the current OS."""
+        system = platform.system()
+        if system == "Windows":
+            return "Windows NT 10.0; Win64; x64"
+        if system == "Darwin":
+            return "Macintosh; Intel Mac OS X 10_15_7"
+        return "X11; Linux x86_64"
+
+    def _platform_name(self) -> str:
+        """Returns a human-readable platform name for client hints."""
+        system = platform.system()
+        if system == "Windows":
+            return "Windows"
+        if system == "Darwin":
+            return "macOS"
+        return "Linux"
+
+    def _platform_version(self) -> str:
+        """Returns a plausible platform version string for client hints."""
+        system = platform.system()
+        if system == "Windows":
+            return "10.0.0"
+        if system == "Darwin":
+            return "13.5.0"
+        return "6.9.0"
+
+    def _resolve_user_agent(self) -> Optional[str]:
+        """Determines the user agent string to use for the browser context."""
+        if self.user_agent:
+            self._effective_user_agent = self.user_agent
+            return self.user_agent
+
+        version = self._user_agent_version
+        if not version and self.browser:
+            try:
+                browser_version = self.browser.version
+                if browser_version and "/" in browser_version:
+                    _, version = browser_version.split("/", 1)
+                else:
+                    version = browser_version
+            except Exception:
+                version = None
+
+        if not version:
+            self._effective_user_agent = None
+            return None
+
+        self._user_agent_version = version
+        resolved = (
+            f"Mozilla/5.0 ({self._platform_token()}) "
+            f"AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{version} Safari/537.36"
+        )
+        self._effective_user_agent = resolved
+        return resolved
+
+    def _stealth_init_script(self) -> str:
+        """Returns a script that removes common automation fingerprints."""
+        languages = [self.locale]
+        base_lang = self.locale.split("-")[0]
+        if base_lang not in languages:
+            languages.append(base_lang)
+        lang_array_literal = json.dumps(languages)
+        platform_token = self._platform_token()
+        platform_name = self._platform_name()
+        platform_version = self._platform_version()
+        ua_version = self._user_agent_version or "120.0.0.0"
+        major_version = ua_version.split(".")[0]
+        brands = [
+            {"brand": "Not A(Brand", "version": "99"},
+            {"brand": "Google Chrome", "version": major_version},
+            {"brand": "Chromium", "version": major_version},
+        ]
+        brands_literal = json.dumps(brands)
+
+        return (
+            "(() => {"
+            "  const overrideProperty = (object, property, value) => {"
+            "    if (!object) { return; }"
+            "    try {"
+            "      Object.defineProperty(object, property, {"
+            "        configurable: true,"
+            "        get: () => value,"
+            "      });"
+            "    } catch (error) {}"
+            "  };"
+            "  try {"
+            "    overrideProperty(navigator, 'webdriver', undefined);"
+            f"    overrideProperty(navigator, 'languages', {lang_array_literal});"
+            f"    overrideProperty(navigator, 'language', '{languages[0]}');"
+            f"    overrideProperty(navigator, 'platform', '{platform_token}');"
+            "    overrideProperty(navigator, 'maxTouchPoints', 0);"
+            "    overrideProperty(navigator, 'hardwareConcurrency', 8);"
+            "    overrideProperty(navigator, 'deviceMemory', 8);"
+            "    overrideProperty(navigator, 'pdfViewerEnabled', true);"
+            "    overrideProperty(navigator, 'onLine', true);"
+            "    const fakePlugins = (() => {"
+            "      const plugins = ["
+            "        { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },"
+            "        { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai', description: '' },"
+            "        { name: 'Native Client', filename: 'internal-nacl-plugin', description: '' },"
+            "      ];"
+            "      return Object.assign(plugins, {"
+            "        length: plugins.length,"
+            "        item: (index) => plugins[index],"
+            "        namedItem: (name) => plugins.find((plugin) => plugin.name === name),"
+            "      });"
+            "    })();"
+            "    overrideProperty(navigator, 'plugins', fakePlugins);"
+            "    const fakeMimeTypes = (() => {"
+            "      const mimeTypes = ["
+            "        { type: 'application/pdf', suffixes: 'pdf', description: '', enabledPlugin: fakePlugins[0] },"
+            "        { type: 'application/x-google-chrome-pdf', suffixes: 'pdf', description: '', enabledPlugin: fakePlugins[1] },"
+            "      ];"
+            "      return Object.assign(mimeTypes, {"
+            "        length: mimeTypes.length,"
+            "        item: (index) => mimeTypes[index],"
+            "        namedItem: (name) => mimeTypes.find((mime) => mime.type === name),"
+            "      });"
+            "    })();"
+            "    overrideProperty(navigator, 'mimeTypes', fakeMimeTypes);"
+            "    if (!window.chrome) {"
+            "      window.chrome = { runtime: {}, app: { isInstalled: false }, webstore: { onInstallStageChanged: {}, onDownloadProgress: {} } };"
+            "    } else {"
+            "      if (!window.chrome.runtime) { window.chrome.runtime = {}; }"
+            "    }"
+            "    const originalPermissions = navigator.permissions;"
+            "    if (originalPermissions && originalPermissions.query) {"
+            "      const originalQuery = originalPermissions.query.bind(originalPermissions);"
+            "      navigator.permissions.query = (parameters) => {"
+            "        if (parameters && parameters.name === 'notifications') {"
+            "          return Promise.resolve({ state: Notification.permission });"
+            "        }"
+            "        return originalQuery(parameters);"
+            "      };"
+            "    }"
+            "    const connection = {"
+            "      downlink: 10,"
+            "      effectiveType: '4g',"
+            "      rtt: 45,"
+            "      saveData: false,"
+            "    };"
+            "    overrideProperty(navigator, 'connection', connection);"
+            f"    const userAgentDataBrands = {brands_literal};"
+            f"    const userAgentDataPlatform = '{platform_name}';"
+            "    if (navigator.userAgentData) {"
+            "      overrideProperty(navigator.userAgentData, 'brands', userAgentDataBrands);"
+            "      overrideProperty(navigator.userAgentData, 'mobile', false);"
+            "      overrideProperty(navigator.userAgentData, 'platform', userAgentDataPlatform);"
+            "      if (navigator.userAgentData.getHighEntropyValues) {"
+            "        const originalGetHighEntropyValues = navigator.userAgentData.getHighEntropyValues.bind(navigator.userAgentData);"
+            "        navigator.userAgentData.getHighEntropyValues = (hints) => originalGetHighEntropyValues(hints).then((values) => {"
+            f"          values.platform = userAgentDataPlatform;"
+            f"          values.platformVersion = '{platform_version}';"
+            f"          values.uaFullVersion = '{ua_version}';"
+            "          values.architecture = 'x86';"
+            "          values.bitness = '64';"
+            "          values.model = '';"
+            "          return values;"
+            "        });"
+            "      }"
+            "    }"
+            "  } catch (error) {"
+            "    console.debug('Stealth script error', error);"
+            "  }"
+            "})();"
+        )
 
     def _navigate(self, url: str, timeout_override: Optional[int] = None) -> None:
         """Navigates to a URL with error handling and human-like delay."""
@@ -282,25 +459,119 @@ class BaseScraper(ABC):
         with sync_playwright() as p:
             self.playwright = p
             try:
-                logger.info(
-                    f"Launching browser for {self._get_bank_id()} (headless: {self.headless})..."
+                self.browser = None
+                self.browser_context = None
+                self.page = None
+
+                version_hint = getattr(self.playwright.chromium, "version", None)
+                if version_hint:
+                    version_str = str(version_hint).strip()
+                    if version_str:
+                        self._user_agent_version = version_str.split(" ")[-1]
+                resolved_user_agent = self._resolve_user_agent()
+
+                launch_options = {
+                    "headless": self.headless,
+                    "slow_mo": self.slow_mo,
+                }
+
+                info_parts: List[str] = []
+                if self.browser_executable:
+                    launch_options["executable_path"] = self.browser_executable
+                    info_parts.append(f"executable: {self.browser_executable}")
+                    if self.browser_channel:
+                        logger.warning(
+                            "Both SCRAPER_BROWSER_EXECUTABLE and SCRAPER_BROWSER_CHANNEL are set; "
+                            "the executable path will take precedence."
+                        )
+                elif self.browser_channel:
+                    launch_options["channel"] = self.browser_channel
+                    info_parts.append(f"channel: {self.browser_channel}")
+                else:
+                    info_parts.append("channel: bundled-chromium")
+
+                args = launch_options.setdefault("args", [])
+                extra_args = [
+                    "--disable-blink-features=AutomationControlled",
+                    "--disable-infobars",
+                    f"--lang={self.locale}",
+                    "--start-maximized",
+                ]
+                for arg in extra_args:
+                    if arg not in args:
+                        args.append(arg)
+
+                ignore_defaults = launch_options.setdefault("ignore_default_args", [])
+                if "--enable-automation" not in ignore_defaults:
+                    ignore_defaults.append("--enable-automation")
+
+                profile_label = (
+                    f"profile: {self.chrome_user_data_dir}"
+                    if self.chrome_user_data_dir
+                    else "profile: ephemeral"
                 )
-                self.browser = self.playwright.chromium.launch(
-                    headless=self.headless, slow_mo=self.slow_mo
+                info_parts.append(profile_label)
+                info_parts.append(
+                    "ua: custom" if self.user_agent or resolved_user_agent else "ua: auto"
+                )
+
+                logger.info(
+                    "Launching browser for {} (headless: {}, {})...",
+                    self._get_bank_id(),
+                    self.headless,
+                    ", ".join(info_parts),
                 )
 
                 context_options = {
-                    "user_agent": self.user_agent,
                     "viewport": self.viewport,
                     "locale": self.locale,
                     "timezone_id": self.timezone_id,
                 }
-                context = self.browser.new_context(**context_options)
-                context.add_init_script(
-                    "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
-                )
-                self.page = context.new_page()
+                if resolved_user_agent:
+                    context_options["user_agent"] = resolved_user_agent
+
+                if self.chrome_user_data_dir:
+                    os.makedirs(self.chrome_user_data_dir, exist_ok=True)
+                    persistent_options = {**launch_options, **context_options}
+                    self.browser_context = (
+                        self.playwright.chromium.launch_persistent_context(
+                            self.chrome_user_data_dir,
+                            **persistent_options,
+                        )
+                    )
+                    self.browser = self.browser_context.browser
+                    for existing_page in list(self.browser_context.pages):
+                        try:
+                            existing_page.close()
+                        except Exception:
+                            pass
+                else:
+                    self.browser = self.playwright.chromium.launch(**launch_options)
+                    self.browser_context = self.browser.new_context(**context_options)
+
+                if not self._effective_user_agent:
+                    self._resolve_user_agent()
+
+                self.browser_context.add_init_script(self._stealth_init_script())
+                self.page = self.browser_context.new_page()
                 self.page.set_default_timeout(self.default_timeout)
+
+                try:
+                    reported_user_agent = self.page.evaluate(
+                        "() => navigator.userAgent"
+                    )
+                    logger.debug(
+                        "navigator.userAgent reported as: {}", reported_user_agent
+                    )
+                    if self._effective_user_agent:
+                        logger.debug(
+                            "navigator.userAgent override in effect: {}",
+                            self._effective_user_agent,
+                        )
+                except Exception as ua_err:
+                    logger.debug(
+                        "Could not read navigator.userAgent: {}", ua_err
+                    )
 
                 logger.info(f"Logging into {self._get_bank_id()}...")
                 self._login()
@@ -327,7 +598,16 @@ class BaseScraper(ABC):
                     self._save_debug_info("unexpected_error")
                 raise
             finally:
-                if self.browser:
-                    self.browser.close()
-                    logger.info(f"Browser closed for {self._get_bank_id()}.")
+                try:
+                    if self.browser_context:
+                        self.browser_context.close()
+                        logger.info(
+                            f"Browser context closed for {self._get_bank_id()}."
+                        )
+                    elif self.browser:
+                        self.browser.close()
+                        logger.info(f"Browser closed for {self._get_bank_id()}.")
+                finally:
+                    self.browser_context = None
+                    self.browser = None
         return []

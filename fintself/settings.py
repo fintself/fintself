@@ -23,10 +23,33 @@ _slow_mo_env = os.getenv("SCRAPER_SLOW_MO")
 SCRAPER_SLOW_MO = (
     int(_slow_mo_env) if _slow_mo_env is not None and _slow_mo_env.isdigit() else 100
 )  # ms, default 100
-SCRAPER_USER_AGENT = os.getenv(
-    "SCRAPER_USER_AGENT",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
+_browser_channel_env = os.getenv("SCRAPER_BROWSER_CHANNEL")
+SCRAPER_BROWSER_CHANNEL = (
+    _browser_channel_env.strip()
+    if _browser_channel_env is not None and _browser_channel_env.strip()
+    else None
 )
+_browser_executable_env = os.getenv("SCRAPER_BROWSER_EXECUTABLE")
+SCRAPER_BROWSER_EXECUTABLE = (
+    _browser_executable_env.strip()
+    if _browser_executable_env is not None and _browser_executable_env.strip()
+    else None
+)
+_chrome_user_data_dir_env = os.getenv("SCRAPER_CHROME_USER_DATA_DIR")
+SCRAPER_CHROME_USER_DATA_DIR = (
+    os.path.expanduser(_chrome_user_data_dir_env.strip())
+    if _chrome_user_data_dir_env is not None and _chrome_user_data_dir_env.strip()
+    else None
+)
+_user_agent_env = os.getenv("SCRAPER_USER_AGENT")
+if _user_agent_env is None:
+    SCRAPER_USER_AGENT = None
+else:
+    _user_agent_clean = _user_agent_env.strip()
+    if not _user_agent_clean or _user_agent_clean.lower() == "auto":
+        SCRAPER_USER_AGENT = None
+    else:
+        SCRAPER_USER_AGENT = _user_agent_clean
 SCRAPER_VIEWPORT_WIDTH = int(os.getenv("SCRAPER_VIEWPORT_WIDTH", "1366"))
 SCRAPER_VIEWPORT_HEIGHT = int(os.getenv("SCRAPER_VIEWPORT_HEIGHT", "768"))
 SCRAPER_LOCALE = os.getenv("SCRAPER_LOCALE", "es-CL")

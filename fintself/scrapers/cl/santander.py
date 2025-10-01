@@ -1,4 +1,5 @@
 import re
+import time
 from typing import List, Optional
 
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
@@ -49,70 +50,135 @@ class SantanderScraper(BaseScraper):
             self._save_debug_info("login_iframe_timeout")
             raise LoginError("Timeout waiting for Santander login iframe.")
 
-        logger.info("Entering credentials.")
-        # Prefer fill with verification over typing to avoid partial input with masks
-        rut_input = login_frame.locator('role=textbox[name="RUT"]')
-        pwd_input = login_frame.locator('role=textbox[name="Clave"]')
+        max_login_attempts = 2
 
-        try:
-            expect(rut_input).to_be_visible(timeout=20000)
-            expect(rut_input).to_be_editable(timeout=20000)
-        except PlaywrightTimeoutError:
-            self._save_debug_info("rut_input_not_editable")
-            raise LoginError("RUT input not editable in time.")
-
-        # Fill RUT with a short retry if it doesn't fully stick
         def _digits(s: str) -> str:
             return re.sub(r"\D", "", s or "")
 
-        for attempt in range(3):
-            rut_input.fill("", timeout=15000)
-            rut_input.fill(self.user, timeout=15000)
-            entered = rut_input.input_value(timeout=8000)
-            if _digits(entered) == _digits(self.user):
-                break
-            logger.warning(
-                f"RUT field mismatch after attempt {attempt+1}. Retrying..."
-            )
-            page.wait_for_timeout(300)
-        else:
-            self._save_debug_info("rut_input_mismatch")
-            raise LoginError(
-                "Could not reliably enter RUT in Santander login field."
-            )
+        for login_attempt in range(max_login_attempts):
+            if login_attempt > 0:
+                logger.warning(
+                    "Retrying Santander login after banner (attempt %s).",
+                    login_attempt + 1,
+                )
+                page.wait_for_timeout(1200)
 
-        # Fill password (single attempt should be fine), verify length
-        try:
-            expect(pwd_input).to_be_visible(timeout=20000)
-            expect(pwd_input).to_be_editable(timeout=20000)
-            pwd_input.fill("", timeout=15000)
-            pwd_input.fill(self.password, timeout=15000)
+            logger.info("Entering credentials.")
+            # Prefer fill with verification over typing to avoid partial input with masks
+            rut_input = login_frame.locator('role=textbox[name="RUT"]')
+            pwd_input = login_frame.locator('role=textbox[name="Clave"]')
+
             try:
-                if len(pwd_input.input_value(timeout=5000)) != len(self.password):
-                    logger.warning("Password length mismatch after fill. Retrying once...")
-                    page.wait_for_timeout(200)
-                    pwd_input.fill("", timeout=10000)
-                    pwd_input.fill(self.password, timeout=10000)
-            except Exception:
-                # Some inputs may not allow reading value; ignore in that case
-                pass
-        except PlaywrightTimeoutError:
-            self._save_debug_info("password_input_not_editable")
-            raise LoginError("Password input not editable in time.")
-        self._save_debug_info("02_credentials_entered")
+                expect(rut_input).to_be_visible(timeout=20000)
+                expect(rut_input).to_be_editable(timeout=20000)
+            except PlaywrightTimeoutError:
+                self._save_debug_info("rut_input_not_editable")
+                raise LoginError("RUT input not editable in time.")
 
-        logger.info("Submitting login form.")
-        self._click(login_frame.locator('role=button[name="Ingresar"]'))
+            for attempt in range(3):
+                rut_input.fill("", timeout=15000)
+                self._fill(rut_input, self.user, timeout_override=15000)
+                entered = rut_input.input_value(timeout=8000)
+                if _digits(entered) == _digits(self.user):
+                    break
+                logger.warning(
+                    f"RUT field mismatch after attempt {attempt+1}. Retrying..."
+                )
+                page.wait_for_timeout(300)
+            else:
+                self._save_debug_info("rut_input_mismatch")
+                raise LoginError(
+                    "Could not reliably enter RUT in Santander login field."
+                )
 
-        logger.info("Waiting for post-login confirmation.")
-        try:
-            expect(page.locator("h3:has-text('Hola')")).to_be_visible(timeout=40000)
-            self._save_debug_info("03_login_success")
-            logger.info("Login to Santander successful.")
-        except PlaywrightTimeoutError:
+            # Fill password (single attempt should be fine), verify length
+            try:
+                expect(pwd_input).to_be_visible(timeout=20000)
+                expect(pwd_input).to_be_editable(timeout=20000)
+                pwd_input.fill("", timeout=15000)
+                self._fill(
+                    pwd_input,
+                    self.password,
+                    timeout_override=18000,
+                )
+                try:
+                    if len(pwd_input.input_value(timeout=5000)) != len(self.password):
+                        logger.warning(
+                            "Password length mismatch after fill. Retrying once..."
+                        )
+                        page.wait_for_timeout(200)
+                        pwd_input.fill("", timeout=10000)
+                        self._fill(
+                            pwd_input,
+                            self.password,
+                            timeout_override=15000,
+                        )
+                except Exception:
+                    # Some inputs may not allow reading value; ignore in that case
+                    pass
+            except PlaywrightTimeoutError:
+                self._save_debug_info("password_input_not_editable")
+                raise LoginError("Password input not editable in time.")
+            self._save_debug_info("02_credentials_entered")
+
+            logger.info("Submitting login form.")
+            self._click(login_frame.locator('role=button[name="Ingresar"]'))
+
+            logger.info("Waiting for post-login confirmation.")
+            greeting = page.locator("h3:has-text('Hola')")
+            error_banner = page.locator(
+                "text=Ocurrió un error al ingresar a tu banco en línea"
+            )
+
+            deadline = time.time() + 40.0
+            poll_interval_ms = 400
+            result: Optional[str] = None
+
+            while time.time() < deadline:
+                try:
+                    if error_banner.is_visible(timeout=400):
+                        self._save_debug_info("login_error_banner")
+                        result = "error"
+                        break
+                except PlaywrightTimeoutError:
+                    # Locator not visible yet; keep polling.
+                    pass
+
+                try:
+                    if greeting.is_visible(timeout=400):
+                        self._save_debug_info("03_login_success")
+                        logger.info("Login to Santander successful.")
+                        return
+                except PlaywrightTimeoutError:
+                    pass
+
+                page.wait_for_timeout(poll_interval_ms)
+
+            if result == "error" and login_attempt + 1 < max_login_attempts:
+                logger.warning("Santander displayed error banner; will retry once.")
+                try:
+                    banner_container = page.locator(
+                        "div.bg-primary-black",
+                        has_text="Ocurrió un error al ingresar a tu banco en línea",
+                    )
+                    ok_button = banner_container.locator("text=Ok")
+                    if ok_button.count():
+                        ok_button.first.click(timeout=3000)
+                except Exception as dismiss_err:
+                    logger.warning(
+                        "Could not dismiss Santander error banner cleanly: %s",
+                        dismiss_err,
+                    )
+                continue
+
+            if result == "error":
+                raise LoginError(
+                    "Santander displayed an error banner after submitting credentials."
+                )
+
             self._save_debug_info("post_login_error")
             raise LoginError(
-                "Timeout or error after login to Santander. Credentials might be incorrect."
+                "Timeout or unexpected layout after login to Santander."
             )
 
     def _extract_and_store_account_ids(self) -> None:
