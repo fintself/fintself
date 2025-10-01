@@ -6,6 +6,24 @@ EXPORT_DIR="$BASE_DIR/exports"
 VENV_BIN="/home/igna/fintself-venv/bin"
 SCRAPER_BIN="$VENV_BIN/fintself"
 XVFB_BIN="/usr/bin/xvfb-run"
+CHROME_PROFILE_DIR="/home/igna/.config/google-chrome-fintself"
+
+# Best-effort cleanup of lingering Chrome profile holders before launch
+if command -v pkill >/dev/null 2>&1; then
+    pkill -f google-chrome-fintself 2>/dev/null || true
+    # Wait briefly for processes to exit to avoid profile lock races
+    for _ in $(seq 1 10); do
+        if ! pgrep -f google-chrome-fintself >/dev/null 2>&1; then
+            break
+        fi
+        sleep 0.5
+    done
+fi
+
+# Clear stale Chrome singleton lock files that may prevent new sessions
+if [ -d "$CHROME_PROFILE_DIR" ]; then
+    rm -f "$CHROME_PROFILE_DIR"/Singleton{Lock,Cookie,Socket} 2>/dev/null || true
+fi
 
 mkdir -p "$EXPORT_DIR"
 
