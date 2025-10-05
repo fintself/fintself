@@ -11,7 +11,8 @@ DEBUG = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes")
 
 # Determines if browser automation runs in headless mode.
 # Set to "true", "1", or "yes" for headless, otherwise defaults to non-headless (False).
-SCRAPER_HEADLESS_MODE = os.getenv("SCRAPER_HEADLESS_MODE", "true").lower() in (
+# Note: Headless mode may not work properly with some banks. Visible mode is recommended.
+SCRAPER_HEADLESS_MODE = os.getenv("SCRAPER_HEADLESS_MODE", "false").lower() in (
     "true",
     "1",
     "yes",
