@@ -67,7 +67,7 @@ def scrape_bank_command(
     headless: Optional[bool] = typer.Option(
         None,
         "--headless/--no-headless",
-        help="Run browser in headless mode or not, overriding .env configuration.",
+        help="Run browser in headless mode (may not work properly with some banks) or visible mode, overriding .env configuration.",
         show_default=False,
     ),
 ):
@@ -114,6 +114,13 @@ def scrape_bank_command(
         password = getpass(f"Password for {bank_id}: ")
 
     try:
+        # Warn if headless mode is explicitly enabled
+        if headless is True:
+            logger.warning(
+                "⚠️  Headless mode enabled. Some banks may not work properly in headless mode. "
+                "If you encounter issues, try running without --headless (visible mode)."
+            )
+
         # Pass overrides to scraper factory. If None, settings from .env will be used.
         scraper = get_scraper(bank_id, headless=headless, debug_mode=debug_mode)
         movements = scraper.scrape(user=user, password=password)
