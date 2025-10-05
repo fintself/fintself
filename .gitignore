@@ -220,3 +220,4 @@ outputs
 # Local development files (keep only locally)
 docs/
 CLAUDE.md
+TO_DO.md
