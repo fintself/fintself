@@ -58,9 +58,7 @@ def main():
                 f"Debug finished. Found and saved {len(movements)} movements for {BANK_TO_DEBUG} in '{output_filename}'."
             )
         else:
-            logger.info(
-                f"Debug finished. No movements found for {BANK_TO_DEBUG}."
-            )
+            logger.info(f"Debug finished. No movements found for {BANK_TO_DEBUG}.")
 
         logger.info(
             "Check the 'debug_output' folder to see screenshots and HTML files."
