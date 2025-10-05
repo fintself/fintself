@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v1.2.0 (2025-10-05)
+
+### Features
+
+- Change default browser mode to visible for better bank compatibility
+  ([#12](https://github.com/fintself/fintself/pull/12),
+  [`5130c37`](https://github.com/fintself/fintself/commit/5130c37f0e4b3bb855453b3293e01d095b31405b))
+
+
 ## v1.1.0 (2025-08-30)
 
 ### Bug Fixes
