@@ -138,6 +138,43 @@ scraper = get_scraper("cl_santander", debug_mode=True)
 movements = scraper.scrape(user=USER, password=PASSWORD)
 ```
 
+## Modo de ejecución del navegador
+
+Por defecto, Fintself ejecuta el navegador en **modo visible** (no headless), ya que algunos bancos tienen protecciones anti-bot que detectan navegadores sin interfaz gráfica. Esto garantiza la mejor compatibilidad con todos los bancos soportados.
+
+### Modo headless (no recomendado)
+
+Si necesitas ejecutar el navegador en modo headless (sin interfaz gráfica), puedes usar la opción `--headless`, pero ten en cuenta que **algunos bancos pueden no funcionar correctamente**.
+
+```bash
+fintself scrape cl_santander --output-file out.xlsx --headless
+```
+
+⚠️ **Advertencia**: Al usar `--headless`, verás un mensaje de advertencia indicando que algunos bancos pueden fallar. Si encuentras problemas, ejecuta el scraper sin esta opción (modo visible por defecto).
+
+### Desde Python
+
+```python
+# Modo visible (por defecto, recomendado)
+scraper = get_scraper("cl_santander")
+
+# Modo headless (puede no funcionar con algunos bancos)
+scraper = get_scraper("cl_santander", headless=True)
+
+# Forzar modo visible explícitamente
+scraper = get_scraper("cl_santander", headless=False)
+```
+
+### Variables de entorno
+
+También puedes configurar el modo headless mediante la variable de entorno `SCRAPER_HEADLESS_MODE`:
+
+```bash
+# En tu archivo .env o terminal
+export SCRAPER_HEADLESS_MODE=true  # Habilitar headless (no recomendado)
+export SCRAPER_HEADLESS_MODE=false # Modo visible (por defecto)
+```
+
 ## ⚠️ Descargo de responsabilidad
 
 Este software se proporciona "tal cual", sin garantía de ningún tipo. Al utilizar Fintself, estás interactuando con sitios bancarios y manejando credenciales sensibles.
