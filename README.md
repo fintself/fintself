@@ -13,7 +13,7 @@
 <p align="center">
   <a href="https://pypi.org/project/fintself/"><img alt="PyPI" src="https://img.shields.io/pypi/v/fintself.svg"></a>
   <a href="https://github.com/fintself/fintself/actions/workflows/release.yml"><img alt="Build Status" src="https://github.com/fintself/fintself/actions/workflows/release.yml/badge.svg"></a>
-  <a href="https://github.com/fintself/fintself/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/pypi/l/fintself.svg"></a>
+  <a href="https://github.com/fintself/fintself/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
   <a href="https://github.com/psf/black"><img alt="Code style: black" src="https://img.shields.io/badge/code%20style-black-000000.svg"></a>
   <a href="https://pypistats.org/packages/fintself"><img alt="PyPI - Downloads" src="https://img.shields.io/pypi/dm/fintself"></a>
 </p>
