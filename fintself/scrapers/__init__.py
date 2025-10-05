@@ -5,13 +5,14 @@ from fintself.scrapers.base import BaseScraper
 from fintself.utils.logging import logger
 
 # Import specific scrapers here so the factory can find them
-from .cl import BancoChileScraper, CencosudScraper, SantanderScraper
+from .cl import BancoChileScraper, BancoEstadoScraper, CencosudScraper, SantanderScraper
 
 # Dictionary that maps bank IDs to scraper classes
 _SCRAPERS: Dict[str, Type[BaseScraper]] = {
     "cl_santander": SantanderScraper,
     "cl_cencosud": CencosudScraper,
     "cl_banco_chile": BancoChileScraper,
+    "cl_estado": BancoEstadoScraper,
 }
 
 
@@ -58,6 +59,7 @@ def list_available_scrapers() -> Dict[str, str]:
         "cl_santander": "Scraper for Banco Santander Chile.",
         "cl_cencosud": "Scraper for Tarjeta Cencosud Scotiabank.",
         "cl_banco_chile": "Scraper for Banco de Chile.",
+        "cl_estado": "Scraper for Banco Estado Chile (CuentaRUT).",
     }
 
     return {

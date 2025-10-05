@@ -36,6 +36,7 @@ Actualmente, Fintself soporta los siguientes bancos:
 - 🇨🇱 **Chile**:
   - Banco Santander (`cl_santander`)
   - Banco de Chile (`cl_banco_chile`)
+  - Banco Estado (CuentaRUT) (`cl_estado`)
   - Tarjeta Cencosud Scotiabank (`cl_cencosud`)
 
 Para ver la lista actualizada directamente desde la herramienta, ejecuta `fintself list`.
@@ -79,6 +80,11 @@ pip install fintself
     export CL_SANTANDER_USER="tu-rut"
     export CL_SANTANDER_PASSWORD="tu-clave"
     fintself scrape cl_santander --output-file santander.csv
+
+    # Banco Estado (CuentaRUT)
+    export CL_ESTADO_USER="tu-rut"
+    export CL_ESTADO_PASSWORD="tu-clave"
+    fintself scrape cl_estado --output-file cuenta_rut.xlsx --debug
     ```
 
 ### Uso como librería en Python

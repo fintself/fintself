@@ -12,10 +12,11 @@ load_dotenv()
 
 # --- Debug Configuration ---
 # Modify this variable to choose which bank you want to debug.
-# Available options: "cl_santander", "cl_banco_chile", "cl_cencosud"
-# BANK_TO_DEBUG = "cl_santander"
+# Available options: "cl_santander", "cl_banco_chile", "cl_estado", "cl_cencosud"
+BANK_TO_DEBUG = "cl_santander"
+# BANK_TO_DEBUG = "cl_estado"
 # BANK_TO_DEBUG = "cl_cencosud"
-BANK_TO_DEBUG = "cl_banco_chile"
+# BANK_TO_DEBUG = "cl_banco_chile"
 
 
 def main():
