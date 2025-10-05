@@ -69,6 +69,95 @@ class SantanderScraper(BaseScraper):
                 "Timeout or error after login to Santander. Credentials might be incorrect."
             )
 
+    def _get_all_credit_cards_from_carousel(self) -> List[str]:
+        """Extracts all credit card IDs from the carousel on the credit card pages.
+
+        Returns:
+            List of card IDs in format '**** XXXX'
+        """
+        page = self._ensure_page()
+        logger.info("Detecting all credit cards in carousel...")
+
+        try:
+            # Wait for carousel to load
+            page.wait_for_selector("lib-carousel", timeout=10000)
+            page.wait_for_timeout(2000)  # Wait for carousel to initialize
+
+            # Get all slides in the carousel
+            slides = page.locator("lib-carousel .swiper-slide").all()
+            card_ids = []
+
+            for slide in slides:
+                try:
+                    # Extract card number from the slide
+                    # The format is "* XXXX" inside a <p> with class "product"
+                    product_text = slide.locator("p.product").inner_text(timeout=2000)
+                    # Extract the 4 digits
+                    match = re.search(r"\*\s*(\d{4})", product_text)
+                    if match:
+                        card_id = f"**** {match.group(1)}"
+                        if card_id not in card_ids:
+                            card_ids.append(card_id)
+                            logger.info(f"Found card in carousel: {card_id}")
+                except Exception as e:
+                    logger.warning(f"Could not extract card number from slide: {e}")
+                    continue
+
+            logger.info(f"Total cards found in carousel: {len(card_ids)}")
+            return card_ids
+
+        except Exception as e:
+            logger.warning(f"Could not detect cards from carousel: {e}")
+            self._save_debug_info("carousel_detection_failed")
+            return []
+
+    def _navigate_to_card_in_carousel(self, target_card_index: int) -> bool:
+        """Navigates to a specific card in the carousel by clicking the next button.
+
+        Args:
+            target_card_index: Zero-based index of the card to navigate to
+
+        Returns:
+            True if navigation was successful, False otherwise
+        """
+        page = self._ensure_page()
+        logger.info(f"Navigating to card at index {target_card_index} in carousel...")
+
+        try:
+            # Wait for carousel to be fully loaded and initialized
+            page.wait_for_selector("lib-carousel", timeout=10000)
+            page.wait_for_timeout(3000)  # Wait for carousel initialization
+
+            # Click next button repeatedly to reach target card
+            for i in range(target_card_index):
+                next_button = page.locator("lib-carousel .swiper-button-next")
+
+                # Wait for button to be visible
+                next_button.wait_for(state="visible", timeout=5000)
+
+                # Check if button is disabled
+                class_attr = next_button.get_attribute("class")
+                if class_attr and "swiper-button-disabled" in class_attr:
+                    logger.warning(
+                        f"Next button is disabled at index {i}. This might mean there's only one card in this view."
+                    )
+                    return False
+
+                self._click(next_button)
+                page.wait_for_timeout(1500)  # Wait for animation to complete
+
+            logger.info(f"Successfully navigated to card at index {target_card_index}")
+            return True
+
+        except Exception as e:
+            logger.warning(
+                f"Could not navigate to card at index {target_card_index}: {e}"
+            )
+            self._save_debug_info(
+                f"carousel_navigation_failed_index_{target_card_index}"
+            )
+            return False
+
     def _extract_and_store_account_ids(self) -> None:
         """Scrapes all account IDs from the dashboard, storing them in self.account_ids."""
         page = self._ensure_page()
@@ -94,7 +183,8 @@ class SantanderScraper(BaseScraper):
             logger.warning(f"Could not extract checking account IDs: {e}")
             self._save_debug_info("checking_id_extraction_failed")
 
-        # --- Extract Credit Card IDs ---
+        # --- Extract Credit Card IDs from Dashboard ---
+        # Note: This will be complemented by extracting IDs from the carousel later
         try:
             card_divs = page.locator("#tarjetas-creditos div.box-product").all()
             if card_divs:
@@ -114,31 +204,114 @@ class SantanderScraper(BaseScraper):
 
     def _scrape_movements(self) -> List[MovementModel]:
         """Orchestrates the extraction of all types of card movements."""
+        page = self._ensure_page()
         self.account_ids: dict = {"corriente": {}, "credito": {}}
         self._extract_and_store_account_ids()
 
         all_movements: List[MovementModel] = []
 
-        # Credit Card: Unbilled
-        logger.info("--- Starting extraction of Unbilled CC ---")
+        # Navigate to unbilled page first to detect all cards
+        logger.info("--- Navigating to Unbilled page to detect all cards ---")
         self._navigate(self.UNBILLED_URL, timeout_override=60000)
         self._save_debug_info("04_unbilled_page")
-        all_movements.extend(
-            self._extract_credit_card_movements("no_facturados", "CLP")
-        )
-        self._switch_currency_tab("USD")
-        all_movements.extend(
-            self._extract_credit_card_movements("no_facturados", "USD")
-        )
 
-        # Credit Card: Billed
-        logger.info("--- Starting extraction of Billed CC ---")
-        self._navigate(self.BILLED_URL, timeout_override=60000)
-        self._save_debug_info("05_billed_page")
-        self._switch_currency_tab("CLP")
-        all_movements.extend(self._extract_credit_card_movements("facturados", "CLP"))
-        self._switch_currency_tab("USD")
-        all_movements.extend(self._extract_credit_card_movements("facturados", "USD"))
+        # Detect all credit cards from the carousel
+        credit_cards = self._get_all_credit_cards_from_carousel()
+
+        if not credit_cards:
+            logger.warning("No credit cards found in carousel. Trying old method...")
+            # Fallback to old behavior - process only the current card
+            all_movements.extend(
+                self._extract_credit_card_movements("no_facturados", "CLP")
+            )
+            self._switch_currency_tab("USD")
+            all_movements.extend(
+                self._extract_credit_card_movements("no_facturados", "USD")
+            )
+
+            logger.info("--- Starting extraction of Billed CC ---")
+            self._navigate(self.BILLED_URL, timeout_override=60000)
+            self._save_debug_info("05_billed_page")
+            self._switch_currency_tab("CLP")
+            all_movements.extend(
+                self._extract_credit_card_movements("facturados", "CLP")
+            )
+            self._switch_currency_tab("USD")
+            all_movements.extend(
+                self._extract_credit_card_movements("facturados", "USD")
+            )
+        else:
+            # Process each card
+            for card_index, card_id in enumerate(credit_cards):
+                logger.info(f"\n{'=' * 60}")
+                logger.info(
+                    f"Processing card {card_index + 1}/{len(credit_cards)}: {card_id}"
+                )
+                logger.info(f"{'=' * 60}")
+
+                # Update account_ids for this card
+                self.account_ids["credito"]["CLP"] = card_id
+                self.account_ids["credito"]["USD"] = card_id
+
+                # --- Unbilled Movements ---
+                logger.info(f"--- Extracting Unbilled movements for {card_id} ---")
+                self._navigate(self.UNBILLED_URL, timeout_override=60000)
+                page.wait_for_timeout(2000)  # Wait for page to fully load
+
+                # Navigate to the specific card in the carousel
+                if card_index > 0:
+                    if not self._navigate_to_card_in_carousel(card_index):
+                        logger.warning(
+                            f"Could not navigate to card {card_id} in carousel. Skipping..."
+                        )
+                        continue
+
+                self._save_debug_info(
+                    f"04_unbilled_page_card_{card_id.replace(' ', '_')}"
+                )
+
+                # Extract CLP movements
+                self._switch_currency_tab("CLP")
+                all_movements.extend(
+                    self._extract_credit_card_movements("no_facturados", "CLP")
+                )
+
+                # Extract USD movements
+                self._switch_currency_tab("USD")
+                all_movements.extend(
+                    self._extract_credit_card_movements("no_facturados", "USD")
+                )
+
+                # --- Billed Movements ---
+                logger.info(f"--- Extracting Billed movements for {card_id} ---")
+                self._navigate(self.BILLED_URL, timeout_override=60000)
+                page.wait_for_timeout(2000)  # Wait for page to fully load
+
+                # Navigate to the specific card in the carousel
+                if card_index > 0:
+                    if not self._navigate_to_card_in_carousel(card_index):
+                        logger.warning(
+                            f"Could not navigate to card {card_id} in carousel. Skipping billed movements..."
+                        )
+                        continue
+
+                self._save_debug_info(
+                    f"05_billed_page_card_{card_id.replace(' ', '_')}"
+                )
+
+                # Extract CLP movements
+                self._switch_currency_tab("CLP")
+                all_movements.extend(
+                    self._extract_credit_card_movements("facturados", "CLP")
+                )
+
+                # Extract USD movements
+                self._switch_currency_tab("USD")
+                all_movements.extend(
+                    self._extract_credit_card_movements("facturados", "USD")
+                )
+
+                logger.info(f"Finished processing card {card_id}")
 
         # Debit Card (Checking Account)
         all_movements.extend(self._scrape_debit_card_movements())
