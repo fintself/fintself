@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v1.3.0 (2025-10-05)
+
+### Features
+
+- Add multiple credit card support for santander scraper
+  ([#14](https://github.com/fintself/fintself/pull/14),
+  [`4a8e231`](https://github.com/fintself/fintself/commit/4a8e2312d0c3f28755ca246df423cd745a3c7dd4))
+
+- Add multiple credit card support for Santander scraper (#13)
+  ([#14](https://github.com/fintself/fintself/pull/14),
+  [`4a8e231`](https://github.com/fintself/fintself/commit/4a8e2312d0c3f28755ca246df423cd745a3c7dd4))
+
+
 ## v1.2.0 (2025-10-05)
 
 ### Features
