@@ -11,11 +11,8 @@ from fintself.utils.output import save_to_xlsx
 load_dotenv()
 
 # List of all banks you want to process
-BANKS_TO_SCRAPE = [
-    "cl_santander",
-    "cl_banco_chile",
-    "cl_cencosud"
-]
+BANKS_TO_SCRAPE = ["cl_santander", "cl_banco_chile", "cl_cencosud"]
+
 
 def main():
     """
@@ -60,7 +57,9 @@ def main():
                 logger.info(f"No movements found for {bank_id}.")
 
         except Exception as e:
-            logger.error(f"An error occurred while processing {bank_id}: {e}", exc_info=True)
+            logger.error(
+                f"An error occurred while processing {bank_id}: {e}", exc_info=True
+            )
 
 
 if __name__ == "__main__":

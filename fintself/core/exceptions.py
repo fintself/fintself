@@ -30,7 +30,9 @@ class ScraperNotFound(FintselfException):
     """Exception raised when the requested scraper is not found."""
 
     def __init__(self, bank_id: str):
-        self.message = f"Scraper '{bank_id}' not found. Use 'fintself list' to see available ones."
+        self.message = (
+            f"Scraper '{bank_id}' not found. Use 'fintself list' to see available ones."
+        )
         super().__init__(self.message)
 
 
