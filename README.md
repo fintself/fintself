@@ -13,7 +13,7 @@
 <p align="center">
   <a href="https://pypi.org/project/fintself/"><img alt="PyPI" src="https://img.shields.io/pypi/v/fintself.svg"></a>
   <a href="https://github.com/fintself/fintself/actions/workflows/release.yml"><img alt="Build Status" src="https://github.com/fintself/fintself/actions/workflows/release.yml/badge.svg"></a>
-  <a href="https://github.com/fintself/fintself/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/pypi/l/fintself.svg"></a>
+  <a href="https://github.com/fintself/fintself/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
   <a href="https://github.com/psf/black"><img alt="Code style: black" src="https://img.shields.io/badge/code%20style-black-000000.svg"></a>
   <a href="https://pypistats.org/packages/fintself"><img alt="PyPI - Downloads" src="https://img.shields.io/pypi/dm/fintself"></a>
 </p>
@@ -36,6 +36,7 @@ Actualmente, Fintself soporta los siguientes bancos:
 - 🇨🇱 **Chile**:
   - Banco Santander (`cl_santander`)
   - Banco de Chile (`cl_banco_chile`)
+  - Banco Estado (CuentaRUT) (`cl_estado`)
   - Tarjeta Cencosud Scotiabank (`cl_cencosud`)
 
 Para ver la lista actualizada directamente desde la herramienta, ejecuta `fintself list`.
@@ -79,6 +80,11 @@ pip install fintself
     export CL_SANTANDER_USER="tu-rut"
     export CL_SANTANDER_PASSWORD="tu-clave"
     fintself scrape cl_santander --output-file santander.csv
+
+    # Banco Estado (CuentaRUT)
+    export CL_ESTADO_USER="tu-rut"
+    export CL_ESTADO_PASSWORD="tu-clave"
+    fintself scrape cl_estado --output-file cuenta_rut.xlsx --debug
     ```
 
 ### Uso como librería en Python

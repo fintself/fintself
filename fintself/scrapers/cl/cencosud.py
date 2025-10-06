@@ -20,7 +20,7 @@ class CencosudScraper(BaseScraper):
         """Performs the login on mitarjetacencosud.cl."""
         assert self.user is not None, "User must be provided"
         assert self.password is not None, "Password must be provided"
-        
+
         self._ensure_page()
         logger.info("Logging into Cencosud.")
         self._navigate(self.LOGIN_URL)

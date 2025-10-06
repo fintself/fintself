@@ -128,9 +128,23 @@ class BaseScraper(ABC):
             raise DataExtractionError(f"Error navigating to {url}: {e}")
 
     def _click(
-        self, selector: Union[str, Locator], timeout_override: Optional[int] = None
+        self,
+        selector: Union[str, Locator],
+        timeout_override: Optional[int] = None,
+        *,
+        force: bool = False,
+        skip_hover: bool = False,
     ) -> None:
-        """Clicks an element with error handling and human-like interaction."""
+        """Clicks an element with error handling and human-like interaction.
+
+        Args:
+            selector: Locator or selector string to click.
+            timeout_override: Optional timeout in milliseconds.
+            force: If True, forces the click even if the element is covered.
+            skip_hover: If True, skips the hover step before clicking. Automatically
+                enabled when ``force`` is True because hover checks would fail if
+                the element is covered by overlays.
+        """
         page = self._ensure_page()
         timeout = (
             timeout_override if timeout_override is not None else self.default_timeout
@@ -138,10 +152,44 @@ class BaseScraper(ABC):
         logger.debug(f"Clicking selector '{str(selector)}' with timeout {timeout}ms.")
         try:
             element = page.locator(selector) if isinstance(selector, str) else selector
-            element.first.wait_for(state="visible", timeout=timeout)
-            element.first.hover(timeout=timeout)
-            self._human_delay(min_override_ms=50, max_override_ms=150)
-            element.first.click(timeout=timeout)
+            target = element.first
+            target.wait_for(state="visible", timeout=timeout)
+            try:
+                target.scroll_into_view_if_needed(timeout=timeout)
+            except PlaywrightTimeoutError:
+                logger.debug(
+                    f"Unable to scroll '{str(selector)}' into view before clicking."
+                )
+
+            effective_force = force
+            perform_hover = not (skip_hover or effective_force)
+
+            if perform_hover:
+                try:
+                    target.hover(timeout=timeout)
+                except PlaywrightTimeoutError as hover_error:
+                    logger.debug(
+                        f"Hover failed for selector '{str(selector)}': {hover_error}. Retrying click with force."
+                    )
+                    effective_force = True
+                    perform_hover = False
+
+            if perform_hover:
+                self._human_delay(min_override_ms=50, max_override_ms=150)
+            else:
+                self._human_delay(min_override_ms=30, max_override_ms=80)
+
+            try:
+                target.click(timeout=timeout, force=effective_force)
+            except PlaywrightTimeoutError as click_error:
+                if not effective_force:
+                    logger.debug(
+                        f"Click timeout for selector '{str(selector)}'. Retrying with force."
+                    )
+                    target.click(timeout=timeout, force=True)
+                else:
+                    raise click_error
+
             self._human_delay()
         except PlaywrightTimeoutError as e:
             logger.error(f"Timeout clicking selector '{str(selector)}': {e}")
